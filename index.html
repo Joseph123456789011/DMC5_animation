@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>DMC5 - DANTE & VERGIL SIGMA</title>
+    <title>DMC5 - DAYTIME SIGMA (WITH CLOUDS)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: monospace; }
         
@@ -26,7 +26,8 @@
 
         /* UI IN-GAME */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
-        #debug-timer { position: absolute; top: 20px; right: 20px; color: yellow; font-size: 1.5rem; text-shadow: 2px 2px 0 #000; }
+        #debug-timer { position: absolute; top: 20px; right: 20px; color: black; font-weight: bold; font-size: 1.5rem; text-shadow: 1px 1px 0 #fff; }
+        #checkpoint-hint { position: absolute; bottom: 20px; left: 20px; color: rgba(0,0,0,0.7); font-weight: bold; font-size: 12px; }
         #back-btn { position: absolute; top: 20px; left: 20px; padding: 10px 20px; background: red; color: white; border: none; cursor: pointer; pointer-events: auto; font-weight: bold; }
     </style>
 </head>
@@ -45,6 +46,7 @@
     <div id="ui-layer">
         <button id="back-btn" onclick="location.reload()">RESTART</button>
         <div id="debug-timer">TIME: 0.00s</div>
+        <div id="checkpoint-hint">TEKAN: [1-0] Skip | [-][=][[]] Ending Scenes</div>
     </div>
 
     <script type="importmap">
@@ -84,22 +86,16 @@
             if (keys.hasOwnProperty(key)) keys[key] = true;
             if (e.key === 'Shift') keys.shift = true;
 
-            // Fitur Timeskip Adegan (Angka 1-9 dan 0)
             if (mode === 'cinematic') {
                 const skipMap = {
                     '1': 0, '2': 8.5, '3': 12.2, '4': 13.2, '5': 17.0,
                     '6': 24.0, '7': 29.0, '8': 34.5, '9': 38.5, '0': 42.0,
-                    '-': 45.0, 
-                    '=': 48.0,   // Adegan 12: Orbit Rotate
-                    '[': 53.0,   // Adegan 13: Dante Close-up Final
-                    ']': 56.0    // Adegan 14: Vergil Close-up Final
+                    '-': 45.0, '=': 48.0, '[': 53.0, ']': 56.0
                 };
 
                 if (skipMap[e.key] !== undefined) {
                     time = skipMap[e.key];
-                    
                     if(vergilModel) {
-                        // Konsistensi posisi Vergil di Z=42 untuk adegan 5 ke atas
                         if (time >= 21.5) {
                             vergilModel.position.z = 42; 
                             vergilModel.rotation.y = (time >= 24) ? Math.PI : 0;
@@ -118,30 +114,97 @@
             if (e.key === 'Shift') keys.shift = false;
         });
 
-        
+        // --- FITUR BARU: AWAN PROSEDURAL ---
+        function createClouds() {
+            // Kita buat awan dari gabungan geometri sederhana
+            const cloudGeo = new THREE.DodecahedronGeometry(1, 0); // Bentuk agak low-poly
+            const cloudMat = new THREE.MeshStandardMaterial({ 
+                color: 0xffffff, 
+                roughness: 0.1,
+                flatShading: true,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            const cloudGroup = new THREE.Group();
+
+            // Buat 15 cluster awan
+            for(let i=0; i<15; i++) { 
+                const cluster = new THREE.Group();
+                const blobs = 3 + Math.floor(Math.random() * 5); // 3-8 gumpalan per awan
+
+                for(let j=0; j<blobs; j++) {
+                    const mesh = new THREE.Mesh(cloudGeo, cloudMat);
+                    mesh.position.set(
+                        (Math.random()-0.5)*8, 
+                        (Math.random()-0.5)*3, 
+                        (Math.random()-0.5)*5
+                    );
+                    const scale = 2 + Math.random() * 4;
+                    mesh.scale.set(scale, scale * 0.6, scale); // Agak gepeng
+                    mesh.castShadow = true; // Awan juga bikin bayangan!
+                    cluster.add(mesh);
+                }
+                
+                // Sebar awan di langit
+                cluster.position.set(
+                    (Math.random()-0.5) * 150, // Sebar di X
+                    35 + Math.random() * 20,   // Tinggi Y (35-55)
+                    (Math.random()-0.5) * 100 - 20 // Sebar di Z
+                );
+                
+                cloudGroup.add(cluster);
+            }
+            scene.add(cloudGroup);
+            log("Clouds Generated.");
+        }
 
         function init() {
-            log("Memulai Three.js...");
+            log("Memulai Three.js (Daytime Sigma)...");
             
             try {
                 scene = new THREE.Scene();
-                scene.background = new THREE.Color(0x87CEEB);
-                scene.fog = new THREE.Fog(0x87CEEB, 20, 150);
+                
+                // === LANGIT BIRU CERAH ===
+                const skyColor = 0x87CEEB; // Sky Blue klasik
+                scene.background = new THREE.Color(skyColor);
+                // Kabut disesuaikan dengan warna langit agar horizon menyatu
+                scene.fog = new THREE.Fog(skyColor, 20, 120); 
 
                 camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
                 
-                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); 
+                renderer = new THREE.WebGLRenderer({ antialias: true });
                 renderer.setSize(window.innerWidth, window.innerHeight);
+                
                 renderer.shadowMap.enabled = true;
-                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 1.0; 
                 document.body.appendChild(renderer.domElement);
 
-                // Lighting
-                const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2); scene.add(hemi);
-                const dir = new THREE.DirectionalLight(0xffffff, 1.5);
-                dir.position.set(10, 20, 10); dir.castShadow = true; scene.add(dir);
-
+                // === PENCAHAYAAN MATAHARI (HARD LIGHT) ===
                 
+                // 1. Ambient Light (Terang siang hari)
+                const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8); 
+                scene.add(hemi);
+
+                // 2. MATAHARI (Sangat Terang & Tajam)
+                const dir = new THREE.DirectionalLight(0xffffff, 3.0); 
+                dir.position.set(-20, 50, 30); // Posisi matahari tinggi
+                dir.castShadow = true;
+                
+                // Setup Shadow Matahari
+                dir.shadow.mapSize.width = 4096; 
+                dir.shadow.mapSize.height = 4096;
+                dir.shadow.camera.near = 0.5;
+                dir.shadow.camera.far = 150;
+                dir.shadow.camera.left = -60;
+                dir.shadow.camera.right = 60;
+                dir.shadow.camera.top = 60;
+                dir.shadow.camera.bottom = -60;
+                dir.shadow.bias = -0.0005;
+                scene.add(dir);
+
                 // Audio Video
                 const listener = new THREE.AudioListener(); camera.add(listener);
                 sound = new THREE.Audio(listener);
@@ -176,12 +239,10 @@
                     playDanteAnim('Stand');
                 }
                 if(vergilModel) {
-                    // Mulai dari posisi duduk yang pas di kursi
                     vergilModel.position.set(-20, 0, 40.0);
                     vergilModel.rotation.set(0, 0, 0);
                     playVergilAnim('Sit', 0);
                 }
-
                 
                 if(m === 'freecam') { camera.position.set(0, 10, 50); camera.lookAt(0,0,0); }
                 animate();
@@ -190,13 +251,7 @@
 
         // --- CLEANERS ---
         function sanitizeBoneName(name) { return name.replace('mixamorig', '').replace(':', ''); }
-        
-        function sanitizeModel(model) {
-            model.traverse((child) => {
-                if (child.isBone) child.name = sanitizeBoneName(child.name);
-            });
-        }
-
+        function sanitizeModel(model) { model.traverse((child) => { if (child.isBone) child.name = sanitizeBoneName(child.name); }); }
         function sanitizeClip(clip) {
             const safeTracks = [];
             clip.tracks.forEach((track) => {
@@ -243,88 +298,78 @@
 
         function setupScene(data) {
             log("Setting up Scene...");
+            
+            // PANGGIL FUNGSI AWAN
+            createClouds();
 
-            if(data.map) { const m=data.map.scene; m.rotation.y=-Math.PI/2; scene.add(m); }
+            if(data.map) { 
+                const m=data.map.scene; 
+                m.rotation.y=-Math.PI/2; 
+                m.traverse(o => { if(o.isMesh) o.receiveShadow = true; });
+                scene.add(m); 
+            }
+
             if(data.chair) { const c=data.chair.scene; c.position.set(-20,0,40); c.scale.set(2,2,2); scene.add(c); }
             if(data.yamato) { const y=data.yamato.scene; y.position.set(30,3,35); y.scale.set(5,5,5); scene.add(y); }
             if(data.rebellion) { const r=data.rebellion.scene; r.name='rebellion'; r.position.set(33,1,40); r.scale.set(1.5,1.5,1.5); scene.add(r); }
 
             if(data.yamato) { 
-                const y = data.yamato.scene; 
-                y.name = 'yamato'; // Memberi nama agar bisa dipanggil getObjectByName
-                y.visible = false; // Sembunyikan dulu
-                y.scale.set(1.5, 1.5, 1.5); // Sesuaikan ukuran
-                scene.add(y); 
+                const y = data.yamato.scene; y.name = 'yamato'; y.visible = false; y.scale.set(1.5, 1.5, 1.5); scene.add(y); 
             }
+            
             // === DANTE ===
             if(data.walk) {
                 danteModel = data.walk.scene;
                 sanitizeModel(danteModel);
                 danteModel.position.set(-20, 0, 15);
                 danteModel.scale.set(2, 2, 2);
-                
                 danteModel.traverse(o => { 
-                    if(o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } 
+                    if(o.isMesh) { 
+                        o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+                        if(o.material) { o.material.roughness = 0.7; o.material.metalness = 0.1; }
+                    } 
                 });
                 scene.add(danteModel);
-
                 danteMixer = new THREE.AnimationMixer(danteModel);
                 mixers.push(danteMixer);
-
                 if(data.walk.animations.length > 0) danteActions['Walk'] = danteMixer.clipAction(sanitizeClip(data.walk.animations[0]));
                 if(data.stand && data.stand.animations.length > 0) danteActions['Stand'] = danteMixer.clipAction(sanitizeClip(data.stand.animations[0]));
                 if(danteActions['Stand']) playDanteAnim('Stand');
             }
 
-            // === VERGIL (FIX VISUAL & POSISI) ===
+            // === VERGIL ===
             if(data.vergil_stand) {
                 log("Configuring Vergil...");
                 vergilModel = data.vergil_stand.scene; 
                 sanitizeModel(vergilModel);
-                
-                // FIX POSISI: Sedikit maju dari kursi (Z = 40.8)
                 vergilModel.position.set(-20, 0, 40.8);
                 vergilModel.scale.set(0.2, 0.2, 0.2); 
-                
                 vergilModel.traverse(o => { 
                     if(o.isMesh) { 
-                        o.castShadow = true; 
-                        o.receiveShadow = true; 
-                        o.frustumCulled = false;
-                        
-                        // === FIX MATERIAL WAJAH & RAMBUT ===
+                        o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
                         if(o.material) {
-                            o.material.depthWrite = true;       // Paksa tulis depth agar tidak tembus
-                            o.material.transparent = false;     // Matikan transparent murni
-                            o.material.alphaTest = 0.5;         // Gunakan alpha cut untuk rambut
-                            o.material.side = THREE.DoubleSide; // Render dua sisi
+                            o.material.depthWrite = true; o.material.transparent = false; 
+                            o.material.alphaTest = 0.5; o.material.side = THREE.DoubleSide; 
+                            o.material.roughness = 0.5; o.material.metalness = 0.3;
                         }
                     } 
                 });
                 scene.add(vergilModel);
-
                 vergilMixer = new THREE.AnimationMixer(vergilModel);
                 mixers.push(vergilMixer);
-
                 if(data.vergil_stand.animations.length > 0) vergilActions['Stand'] = vergilMixer.clipAction(sanitizeClip(data.vergil_stand.animations[0]));
-                
                 if(data.vergil_sit && data.vergil_sit.animations.length > 0) {
                     const clip = sanitizeClip(data.vergil_sit.animations[0]);
                     vergilActions['Sit'] = vergilMixer.clipAction(clip);
-                    vergilActions['Sit'].setLoop(THREE.LoopOnce); 
-                    vergilActions['Sit'].clampWhenFinished = true;
+                    vergilActions['Sit'].setLoop(THREE.LoopOnce); vergilActions['Sit'].clampWhenFinished = true;
                 }
                 playVergilAnim('Sit', 0);
-
-            } else {
-                log("CRITICAL: vergil_standing.glb tidak ditemukan!", 'error');
             }
 
             log("READY TO PLAY!");
             document.getElementById('start-area').style.display = 'block';
         }
 
-        // Helper Animations
         function playDanteAnim(name) {
             if(!danteActions[name]) return;
             const next = danteActions[name];
@@ -334,12 +379,10 @@
             activeDanteAction = next;
         }
 
-        // Helper Vergil
         function playVergilAnim(name, fadeDuration = 1.0) {
             if(!vergilActions[name]) return;
             const next = vergilActions[name];
             if(activeVergilAction === next) return;
-            
             if(activeVergilAction) activeVergilAction.fadeOut(fadeDuration);
             next.reset().fadeIn(fadeDuration).play();
             activeVergilAction = next;
@@ -355,7 +398,6 @@
                 document.getElementById('debug-timer').innerText = "TIME: " + time.toFixed(2);
                 if(time>2 && !sound.isPlaying && sound.buffer) sound.play();
 
-                // adegan 1(0-8.5s)
                 if(time < 8.5) {
                     playDanteAnim('Walk');
                     if(danteModel) {
@@ -364,14 +406,12 @@
                         camera.position.set(-20, 3.5, 32-(time*0.4)); camera.lookAt(-20, 3, danteModel.position.z);
                     }
                 } 
-                // adegan 2 (8.5-17s)
                 else if(time < 12.2) {
                     playDanteAnim('Stand');
                     videoMesh.visible=true; videoMesh.position.set(-20,5,25);
                     camera.position.set(-20,5,31); camera.lookAt(-20,5,25);
                     if(video.paused) video.play();
                 } 
-                // adegan 3 (12.2-13.2s)
                 else if(time < 13.2) {
                     playDanteAnim('Walk');
                     videoMesh.visible=false; video.pause();
@@ -380,43 +420,33 @@
                         camera.position.set(-18.5, 2.5, danteModel.position.z - 5); camera.lookAt(-20, 1.5, 40);
                     }
                 } 
-                // adegan 4 (13.2-17s)
                 else if(time < 17.0) {
                     playDanteAnim('Stand'); if(danteModel) danteModel.position.z=33;
                     const zoomTime = time - 13.2;
                     camera.position.set(-20, 1.8, 34 + (zoomTime * 0.4));
                     camera.lookAt(-20, 1.2, 40);
                 }
-                // adegan 5 (17-24s)
                 else if(time < 24.0) {
                     const t = time - 17.0;
                     const speed = -(t * 0.1) + (Math.PI * 0.4);
                     camera.position.set(-20 + Math.sin(speed)*3.5, 3.5, 40 + Math.cos(speed)*3.5);
                     camera.lookAt(-20, 3, 40);
-
                     if (time > 21.5) { 
-                        // POSISI BERDIRI: Maju lebih jauh ke 41.5 agar jubah/kaki aman
                         if(vergilModel) vergilModel.position.z = 41; 
                         playVergilAnim('Stand', 0.4); 
                     } else {
-                        // POSISI DUDUK: Tetap di 40.0 (pas di kursi)
                         if(vergilModel) vergilModel.position.z = 40.0;
                         playVergilAnim('Sit', 0.5);
                     }
                 }
-                // adegan 6 (24-29s)
                 else if(time < 29.0) {
-                    // Vergil tetap di posisi maju saat berputar
                     if(vergilModel) vergilModel.position.z = 42;
-                    
                     playVergilAnim('Stand', 0.2);
                     if(vergilModel && vergilModel.rotation.y < Math.PI) vergilModel.rotation.y += delta * 1.8;
-                    
                     const t = time - 24.0;
                     camera.position.set(-20, 3.5, 40 - Math.max(3.0, 5.0 - t*0.2));
                     camera.lookAt(-20, 3, 40);
                 }
-                // adegan 7 (29-34.5s)
                 else if(time < 34.5) {
                     const reb = scene.getObjectByName('rebellion');
                     if(vergilModel) vergilModel.position.z = 42;
@@ -426,181 +456,94 @@
                         const zoomProgress = (time - 29.0) * 0.6;
                         camera.position.set(-20, 3.5, 38 - zoomProgress); 
                         camera.lookAt(-20, 3.0, 33);
-                    } 
-                    else {
-                    // --- FASE 2: PEDANG MUNCUL, MELAYANG & BERPUTAR ---
-                    if(reb) { 
-                        reb.visible = true; 
-                        
-                        // 1. EFEK MELAYANG (Naik-Turun)
-                        const hoverOffset = Math.sin(time * 2) * 0.05;
-                        reb.position.set(-20.5, 5.4 + hoverOffset, 33.05); 
-                        
-                        // 2. EFEK BERPUTAR (Rotation)
-                        // time * 1.5 menentukan kecepatan putaran pedang
-                        // Kita biarkan sumbu X tetap (-0.15) dan Z tetap (Math.PI)
-                        reb.rotation.set(-0.15, time * 1.5, Math.PI); 
+                    } else {
+                        if(reb) { 
+                            reb.visible = true; 
+                            const hoverOffset = Math.sin(time * 2) * 0.05;
+                            reb.position.set(-20.5, 5.4 + hoverOffset, 33.05); 
+                            reb.rotation.set(-0.15, time * 1.5, Math.PI); 
+                        }
+                        camera.position.set(-20, 3.5, 35.6);
+                        const tiltProgress = (time - 33.0) * 1.0; 
+                        camera.lookAt(-20 - tiltProgress, 3.2 - (tiltProgress * 0.2), 33);
                     }
-
-                    // Kamera tetap terkunci posisinya
-                    camera.position.set(-20, 3.5, 35.6);
-
-                    // Tilt arah pandang ke pedang
-                    const tiltProgress = (time - 33.0) * 1.0; 
-                    camera.lookAt(
-                        -20 - tiltProgress, 
-                        3.2 - (tiltProgress * 0.2), 
-                        33
-                    );
                 }
-                }
-                // adegan 8 (34.5-38.5s)
                 else if(time < 38.5) {
                     if(vergilModel) vergilModel.rotation.y = Math.PI;
                     camera.position.set(-21 + (Math.random()-0.5)*0.01, 3.5 + (Math.random()-0.5)*0.01, 38.5);
                     camera.lookAt(-20, 3, 40);
                 }
-                // adgean 9 (38.5-42s)
                 else if(time < 42.0) {
                     camera.position.set(-20.5 + (Math.random()-0.5)*0.01, 3.5 + (Math.random()-0.5)*0.01, 34.8);
                     camera.lookAt(-20, 3, 33);
                 }
-
-                // === LOGIKA BARU SESUAI REQUEST ===
-                
-                // adegan 10 (42-45s) - Close up Dante
                 else if (time < 45.0) {
                     playDanteAnim('Stand');
-                    // Menaikkan Y dari 1.75 ke 2.2 agar sejajar kepala Dante
                     camera.position.set(-20.5, 3.5, 33.2);
                     camera.lookAt(-20, 3.5, 33.3);
                 }
-                // adegan 11 (45-48s) - Close up Vergil (Sisi Kiri)
                 else if (time < 48.0) {
-                    // Posisi kamera diatur ke X: -21.5 (Sisi kiri Vergil)
-                    // Ketinggian Y: 3.5 sesuai dengan settingan pas Anda di adegan 10
-                    // Posisi Z: 40.5 agar berada sedikit di depan Vergil (Z: 42)
                     camera.position.set(-20.5, 3.45, 41.7);
-                    
-                    // Kamera menatap ke arah kepala Vergil
                     camera.lookAt(-20, 3.45, 41.8);
                 }
-                // adegan 12 (48-53s) - Orbit Shot Belakang Kanan & Pedang Melayang
                 else if (time < 53.0) {
                     const reb = scene.getObjectByName('rebellion');
-                    const pivotZ = 37.5; 
-                    const pivotX = -20;
-                    const radius = 7.0; 
-                    
-                    // Rotasi orbit kamera sangat pelan
-                    const t = (time - 48.0) * 0.12; 
-                    const angle = t + (Math.PI * 1.1); 
-
-                    camera.position.set(
-                        pivotX + Math.sin(angle) * radius,
-                        3.5, 
-                        pivotZ + Math.cos(angle) * radius
-                    );
+                    const pivotZ = 37.5; const pivotX = -20; const radius = 7.0; 
+                    const t = (time - 48.0) * 0.12; const angle = t + (Math.PI * 1.1); 
+                    camera.position.set(pivotX + Math.sin(angle) * radius, 3.5, pivotZ + Math.cos(angle) * radius);
                     camera.lookAt(pivotX, 2.8, pivotZ);
-
-                    // --- EFEK PEDANG MELAYANG DI ADEGAN 12 ---
                     if(reb) {
                         reb.visible = true;
-                        // Efek naik-turun yang sangat halus (kecepatan 1.2, jarak 0.04)
                         const hoverOffset = Math.sin(time * 1.2) * 0.04;
-                        
-                        // Posisi dasar pedang disesuaikan dengan posisi Dante (sekitar Z: 33-35)
-                        // Kita kunci posisinya agar tidak ikut berputar dengan kamera
                         reb.position.set(-20.5, 5.4 + hoverOffset, 33.05);
-                        
-                        // Opsional: berikan rotasi statis atau putar sangat pelan
                         reb.rotation.set(-0.15, time * 0.5, Math.PI);
                     }
-
                     playDanteAnim('Stand'); 
                 }
-                // adegan 13 (53-56s) - Dante Berhenti & Pedang Mengarah ke Vergil
                 else if (time < 56.0) {
                     const reb = scene.getObjectByName('rebellion');
                     const danteZ = danteModel ? danteModel.position.z : 33;
-                    
                     if (time < 54.0) {
-                        // --- FASE 1: DANTE JALAN & PEDANG MELAYANG ---
                         playDanteAnim('Walk');
                         if (danteModel) danteModel.position.z += delta * 1.5; 
-                        
                         if(reb) {
                             reb.visible = true;
-                            // Pedang mengikuti posisi Dante
                             reb.position.set(-20.5, 5.4 + Math.sin(time*2)*0.03, danteZ + 0.05);
-                            // Rotasi melayang biasa (sebelum diarahkan)
                             reb.rotation.set(-0.15, time * 1.5, Math.PI);
                         }
-
                         camera.position.set(-20, 2, danteZ + 3.0); 
                         camera.lookAt(-20, 3.2, danteZ);
-                    } 
-                    else {
-                        // --- FASE 2: DANTE DIAM & PEDANG POINTER (Diarahkan ke Vergil) ---
+                    } else {
                         playDanteAnim('Stand');
-                        
                         if(reb) {
-                            // 1. Kunci posisi pedang agar berhenti di tempat
                             reb.position.set(-21.5, 4.8, danteZ + 0.5);
-
-                            // 2. Transisi Rotasi sumbu X ke 90 derajat (1.57 Radian)
-                            // Kita gunakan lerp manual agar gerakannya halus dari detik 54 ke 54.5
                             const rotationProgress = Math.min((time - 54.0) * 2, 1.0); 
-                            
-                            // Target: X = 1.57 (90 derajat), Y = 0 (Lurus), Z = Math.PI (Terbalik)
-                            // Kita transisi dari -0.15 ke 1.57 pada sumbu X
                             const targetX = -0.15 + (rotationProgress * (Math.PI/2 + 0.15));
-                            
                             reb.rotation.set(targetX, 0, Math.PI);
                         }
-
-                        // Kamera Tilt ke arah pedang yang menunjuk
                         camera.position.set(-20, 2, danteZ + 3.0);
                         const tiltProgress = (time - 54.0) * 1.0; 
-                        camera.lookAt(
-                            -20 - tiltProgress, 
-                            3.2 - (tiltProgress * 0.2), 
-                            danteZ
-                        );
+                        camera.lookAt(-20 - tiltProgress, 3.2 - (tiltProgress * 0.2), danteZ);
                     }
                 }
-                // --- ADEGAN 14 (56.0s - 59.0s): VERGIL CLOSE-UP & YAMATO REVEAL ---
                 else {
                     const vergilZ = vergilModel ? vergilModel.position.z : 42;
                     const yamato = scene.getObjectByName('yamato');
-                    
                     playVergilAnim('Stand', 0.2);
-                    if(vergilModel) {
-                        vergilModel.position.set(-20, 0, 42); 
-                        vergilModel.rotation.y = Math.PI; 
-                    }
-
-                    // Posisi Kamera tetap di level kepala
+                    if(vergilModel) { vergilModel.position.set(-20, 0, 42); vergilModel.rotation.y = Math.PI; }
                     camera.position.set(-20, 3.45, vergilZ - 1.2);
 
                     if (time < 57.0) {
                         const tiltProgress = (time - 56.0); 
                         const currentLookY = 2.0 + (tiltProgress * 1.45);
                         camera.lookAt(-20, currentLookY, vergilZ);
-
                         if(yamato) {
                             yamato.visible = true;
-                            // PERBAIKAN: Menaikkan titik awal dan titik akhir pergerakan pedang
-                            // Mulai dari Y: 2.2 (Dada) naik ke Y: 3.1 (Dekat bahu/wajah)
                             const yamatoY = 2.2 + (tiltProgress * 0.9);
-                            
-                            // Mendekatkan sedikit posisi Z pedang ke kamera agar lebih jelas terlihat
                             yamato.position.set(-20.5, yamatoY + 0.3, vergilZ -0.3);
                             yamato.rotation.set(0.1, 0, -1.6);
                         }
-                    } 
-                    else {
-                        // FASE DIAM: Kunci pada posisi tinggi agar tidak hilang dari layar
+                    } else {
                         camera.lookAt(-20, 3.45, vergilZ);
                         if(yamato) {
                             yamato.visible = true;
