@@ -1,836 +1,445 @@
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-        <meta charset="UTF-8">
-        <title>DMC5 - Vergil Chair Experience</title>
-        <style>
-            canvas {
-                display: block;
-                width: 100vw;
-                height: 100vh;
-            }
-            body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-            
-            /* --- UI: MAIN MENU --- */
-            #main-menu {
-                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0, 0, 0, 0.85);
-                display: flex; flex-direction: column; justify-content: center; align-items: center;
-                z-index: 10; color: white;
-                transition: opacity 0.5s;
-            }
-            h1 { font-size: 3rem; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 5px; text-shadow: 0 0 10px #00aaff; text-align: center; }
-            p { font-size: 1.2rem; color: #ccc; margin-bottom: 40px; }
-            
-            .btn-container { display: flex; gap: 20px; }
-            .btn {
-                padding: 15px 40px; font-size: 1.2rem; cursor: pointer;
-                border: 2px solid white; background: transparent; color: white;
-                text-transform: uppercase; letter-spacing: 2px;
-                transition: all 0.3s;
-            }
-            .btn:hover { background: white; color: black; box-shadow: 0 0 20px rgba(255,255,255,0.5); }
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>DMC5 - DANTE & VERGIL SIGMA</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: monospace; }
+        
+        /* UI LOADING */
+        #console-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); color: #0f0; 
+            padding: 20px; box-sizing: border-box; overflow-y: auto; z-index: 9999;
+            display: flex; flex-direction: column;
+        }
+        #console-text { flex: 1; white-space: pre-wrap; font-size: 14px; }
+        #start-area { text-align: center; padding: 20px; display: none; border-top: 1px solid #333; }
+        
+        .btn { 
+            padding: 15px 40px; font-size: 1.5rem; cursor: pointer; 
+            border: 2px solid #0f0; background: #000; color: #0f0; 
+            text-transform: uppercase; font-weight: bold; margin: 10px;
+            transition: 0.3s;
+        }
+        .btn:hover { background: #0f0; color: #000; }
 
-            /* --- UI: IN-GAME INFO --- */
-            #ui-layer {
-                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                pointer-events: none;
-                display: none;
-            }
-            #info-box {
-                position: absolute; bottom: 20px; left: 20px;
-                color: white; background: rgba(0, 0, 0, 0.6); padding: 15px; border-radius: 5px;
-                pointer-events: none;
-            }
-            #controls-hint {
-                margin-top: 10px; font-size: 0.9rem; color: #ddd; border-top: 1px solid #555; padding-top: 5px;
-            }
-            #back-btn {
-                position: absolute; top: 20px; left: 20px;
-                padding: 10px 20px; background: #ff4444; color: white; border: none; cursor: pointer;
-                pointer-events: auto; font-weight: bold; border-radius: 5px;
-                z-index: 20;
-            }
-            #back-btn:hover { background: #ff0000; }
+        /* UI IN-GAME */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
+        #debug-timer { position: absolute; top: 20px; right: 20px; color: yellow; font-size: 1.5rem; text-shadow: 2px 2px 0 #000; }
+        #back-btn { position: absolute; top: 20px; left: 20px; padding: 10px 20px; background: red; color: white; border: none; cursor: pointer; pointer-events: auto; font-weight: bold; }
+    </style>
+</head>
+<body>
 
-            /* Loading Screen */
-            #loader { position: absolute; bottom: 20px; right: 20px; color: white; font-style: italic; }
-        </style>
-    </head>
-    <body>
-
-        <div id="main-menu">
-            <h1>The Storm Is Approaching</h1>
-            <p>Interactive 3D Scene Demo</p>
-            <div id="loader">Loading Assets...</div>
-            <div class="btn-container" id="menu-buttons" style="display: none;">
-                <button class="btn" id="btn-trailer">Play Trailer</button>
-                <button class="btn" id="btn-freecam">Free Camera</button>
-            </div>
+    <div id="console-overlay">
+        <h1>SYSTEM STATUS:</h1>
+        <div id="console-text">Initializing...</div>
+        <div id="start-area">
+            <h2 style="color:white;">ASSETS READY</h2>
+            <button class="btn" onclick="startGame('cinematic')">PLAY TRAILER</button>
+            <button class="btn" onclick="startGame('freecam')">FREE CAMERA</button>
         </div>
+    </div>
 
-        <div id="ui-layer">
-            <button id="back-btn">Back to Menu</button>
-            <div id="debug-timer" style="position: absolute; top: 20px; right: 20px; color: #00ff00; background: rgba(0,0,0,0.7); padding: 10px; font-family: monospace; border: 1px solid #00ff00; border-radius: 4px; display: none;">
-                TIME: 0.00s
-                </div>
-            <div id="info-box">
-                <b id="mode-title">MODE</b><br>
-                <span id="mode-desc">Description</span>
-                <div id="controls-hint" style="display:none;">
-                    <b>WASD</b>: Move | <b>Q/E</b>: Up/Down | <b>Shift</b>: Fast<br>
-                    <b>Right Click + Drag</b>: Look Around
-                </div>
-            </div>
-        </div>
+    <div id="ui-layer">
+        <button id="back-btn" onclick="location.reload()">RESTART</button>
+        <div id="debug-timer">TIME: 0.00s</div>
+    </div>
 
-        <script type="importmap">
-            {
-                "imports": {
-                    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-                }
-            }
-        </script>
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+    </script>
 
-        <script type="module">
-            import * as THREE from 'three';
-            import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-            // --- GLOBAL VARIABLES ---
-            let scene, camera, renderer;
-            let danteModel, vergilModel;
-            let sound;
-            let mixers = [];
-            let clock = new THREE.Clock();
-            let time = 0;
-            let currentMode = 'menu'; // 'menu', 'cinematic', 'freecam'
-            let video, videoTexture, videoMesh; // Variabel baru untuk video
-            let standingClip; // Pastikan ini ada di deretan let paling atas
+        // --- VARS ---
+        let scene, camera, renderer, clock;
+        let danteModel, vergilModel;
+        let mixers = []; 
+        let danteMixer, vergilMixer;
+        
+        // Actions
+        let danteActions = {}, activeDanteAction;
+        let vergilActions = {}, activeVergilAction;
 
-            // --- CUSTOM FREECAM VARIABLES (SPEED UPDATE) ---
-            // Saya ubah dari 3.0 menjadi 8.0 agar lebih ngebut
-            const moveSpeedBase = 8.0; 
-            const lookSpeed = 0.002;
-            const keys = { w: false, a: false, s: false, d: false, q: false, e: false, shift: false };
-            let isRightMouseDown = false;
+        let time = 0, mode = 'menu';
+        let video, videoMesh, sound;
+        const keys = { shift: false, w: false, a: false, s: false, d: false, q: false, e: false }; 
+
+        // --- LOGGER ---
+        function log(msg, type='info') {
+            const el = document.getElementById('console-text');
+            const color = type === 'error' ? 'red' : (type === 'warn' ? 'orange' : '#0f0');
+            console.log(msg);
+            el.innerHTML += `<span style="color:${color}">> ${msg}</span><br>`;
+            el.scrollTop = el.scrollHeight; 
+        }
+
+        // --- INPUT HANDLING ---
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) keys[key] = true;
+            if (e.key === 'Shift') keys.shift = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) keys[key] = false;
+            if (e.key === 'Shift') keys.shift = false;
+        });
+
+        function init() {
+            log("Memulai Three.js...");
             
-            // --- INIT SCENE ---
-            function init() {
+            try {
                 scene = new THREE.Scene();
-                scene.background = new THREE.Color(0x87CEEB); 
-                scene.fog = new THREE.Fog(0x87CEEB, 40, 150); 
+                scene.background = new THREE.Color(0x87CEEB);
+                scene.fog = new THREE.Fog(0x87CEEB, 20, 150);
 
-                camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
                 
-                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); 
                 renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.shadowMap.enabled = true; 
+                renderer.shadowMap.enabled = true;
                 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                renderer.toneMapping = THREE.ACESFilmicToneMapping;
                 document.body.appendChild(renderer.domElement);
 
                 // Lighting
-                const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
-                hemiLight.position.set(0, 20, 0);
-                scene.add(hemiLight);
+                const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2); scene.add(hemi);
+                const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+                dir.position.set(10, 20, 10); dir.castShadow = true; scene.add(dir);
 
-                const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
-                sunLight.position.set(10, 20, 10);
-                sunLight.castShadow = true;
-                sunLight.shadow.mapSize.set(2048, 2048);
-                sunLight.shadow.camera.near = 0.5;
-                sunLight.shadow.camera.far = 100;
-                sunLight.shadow.camera.left = -30;
-                sunLight.shadow.camera.right = 30;
-                sunLight.shadow.camera.top = 30;
-                sunLight.shadow.camera.bottom = -30;
-                scene.add(sunLight);
-
-                // --- VIDEO SETUP ---
-                video = document.createElement('video');
-                video.src = 'assets/video/clock.mp4';
-                video.load();
-
-                videoTexture = new THREE.VideoTexture(video);
-
-                // Gunakan Plane yang lebih besar atau sesuaikan dengan aspect ratio video
-                // Jika video 16:9, gunakan perbandingan (16, 9)
-                const videoGeo = new THREE.PlaneGeometry(16, 9); 
-                const videoMat = new THREE.MeshBasicMaterial({ 
-                    map: videoTexture, 
-                    side: THREE.DoubleSide,
-                    transparent: true // Agar jika ada bagian hitam bisa dibuat halus
-                });
-                videoMesh = new THREE.Mesh(videoGeo, videoMat);
-
-                videoMesh.visible = false;
-                scene.add(videoMesh);
-
-                // --- AUDIO SETUP ---
-                const listener = new THREE.AudioListener();
-                camera.add(listener);
-
+                // Audio Video
+                const listener = new THREE.AudioListener(); camera.add(listener);
                 sound = new THREE.Audio(listener);
-                const audioLoader = new THREE.AudioLoader();
-                audioLoader.load('assets/sounds/sound.mp3', function(buffer) {
-                    sound.setBuffer(buffer);
-                    sound.setVolume(0.5);
-                });
+                new THREE.AudioLoader().load('assets/sounds/sound.mp3', b => { 
+                    sound.setBuffer(b); sound.setVolume(0.5); 
+                    log("Audio Loaded");
+                }, undefined, () => log("Audio Gagal Load (Gpp)", 'warn'));
 
-                // Load Assets
+                video = document.createElement('video'); video.src = 'assets/video/clock.mp4'; video.load(); video.muted = true;
+                videoMesh = new THREE.Mesh(new THREE.PlaneGeometry(16, 9), new THREE.MeshBasicMaterial({ map: new THREE.VideoTexture(video), side: 2 }));
+                videoMesh.visible = false; scene.add(videoMesh);
+
+                clock = new THREE.Clock();
+                
+                log("Scene Initialized. Loading Assets...");
                 loadAssets();
-                
-                // UI Event Listeners
-                window.addEventListener('resize', onResize);
-                document.getElementById('btn-trailer').addEventListener('click', () => startMode('cinematic'));
-                document.getElementById('btn-freecam').addEventListener('click', () => startMode('freecam'));
-                document.getElementById('back-btn').addEventListener('click', showMenu);
 
-                // INPUT EVENT LISTENERS (Untuk Free Camera)
-                window.addEventListener('keydown', (e) => {
-                    updateKey(e.key, true);
-
-                    // Fitur "Skip Adegan" untuk memudahkan pengecekan kamu
-                    if (currentMode === 'cinematic') {
-                        if (e.key === '1') time = 0;    // Awal
-                        if (e.key === '2') time = 8.5;  // Video Jam
-                        if (e.key === '3') time = 12.2; // Dante jalan cepat
-                        if (e.key === '4') time = 17.0; // Vergil & Orbit Camera
-                        if (e.key === '5') { 
-                            time = 24.0; 
-                            if(vergilModel) vergilModel.rotation.y = 0; // Reset rotasi agar terlihat putarannya
-                        }
-                        if (e.key === '6') {
-                            time = 29.0;
-                            // Reset pedang agar tidak nyangkut saat skip balik
-                            const rebellion = scene.getObjectByName('rebellion');
-                            if (rebellion) rebellion.visible = false;
-                            console.log("Skipped to Scene 7: Dante's Focus");
-                        }
-                        if (e.key === '7') {
-                            time = 34.5;
-                            console.log("Skipped to Scene 8: Vergil's Tension");
-                        }
-                        if (e.key === '8') {
-                            time = 38.5;
-                            console.log("Skipped to Scene 9: Dante's Reaction");
-                        }
-                        if (e.key === '9') {
-                            time = 42.0;
-                            console.log("Skipped to Scene 10: Dante Close-up Tilt");
-                        }
-                        if (e.key === '0') {
-                            time = 47.0;
-                            console.log("Skipped to Scene 11: vergil Close-up Tilt");
-                        }
-                        if (e.key === '-') {
-                            time = 52.5;
-                            console.log("Skipped to Scene 13: dante sword");
-                        }
-                        if (e.key === '=') {
-                            time = 56;
-                            console.log("Skipped to Scene 14: vergil sword");
-                        }
-
-                        // Jika lompat ke adegan jam, urus videonya
-                        if (time >= 8.5 && time < 12.2) {
-                            video.currentTime = time - 8.5;
-                            video.play();
-                        } else {
-                            video.pause();
-                            videoMesh.visible = false;
-                        }
-                    }
-                });
-                window.addEventListener('keyup', (e) => updateKey(e.key, false));
-                window.addEventListener('mousedown', (e) => { if(e.button === 2) isRightMouseDown = true; });
-                window.addEventListener('mouseup', (e) => { if(e.button === 2) isRightMouseDown = false; });
-                window.addEventListener('mousemove', onMouseMove);
-                // Mencegah menu klik kanan browser muncul
-                window.addEventListener('contextmenu', (e) => e.preventDefault()); 
-
-                animate();
+            } catch (e) {
+                log("CRITICAL ERROR: " + e.message, 'error');
             }
 
-            // --- INPUT HANDLING ---
-            function updateKey(key, isPressed) {
-                const k = key.toLowerCase();
-                if (keys.hasOwnProperty(k)) keys[k] = isPressed;
-                if (key === 'Shift') keys.shift = isPressed;
-            }
-
-            function onMouseMove(event) {
-                if (currentMode === 'freecam' && isRightMouseDown) {
-                    camera.rotation.y -= event.movementX * lookSpeed;
-                    camera.rotation.x -= event.movementY * lookSpeed;
-                    
-                    // Limit Pitch
-                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-                    camera.rotation.order = "YXZ"; 
-                }
-            }
-
-            // --- GLOBAL VARIABLES TAMBAHAN ---
-            let walkingClip; // Menyimpan data animasi jalan
-
-            function loadAssets() {
-                const loader = new GLTFLoader();
-                const modelPath = 'assets/models/';
-                const animPath = 'assets/animations/';
-
-                // 1. DAFTAR ASET YANG AKAN DIMUAT
-                const assets = [
-                    { file: 'walmart.glb', name: 'map', pos: {x:0, y:0, z:0}, rot: {x:0, y:-Math.PI/2, z:0}, scale: 1.0 },
-                    { file: 'plastic_chair.glb', name: 'chair', pos: {x:-20, y:0, z:40}, rot: {x:0, y:0, z:0}, scale: 2.0 },
-                    { file: 'vergil.glb', name: 'vergil', pos: {x:-20, y:0, z:40}, rot: {x:0, y:0, z:0}, scale: 0.2 },
-                    { file: 'dante.glb', name: 'dante', pos: {x:-20, y:0, z:15}, rot: {x:0, y:0, z:0}, scale: 1.6 },
-                    { file: 'vergils_sword.glb', name: 'yamato', pos: {x:30, y:3, z:35}, rot: {x: -0.36, y: 0, z: -1.8}, scale: 5.0 },
-                    { file: 'dantes_sword.glb', name: 'rebellion', pos: {x:33, y:1, z:40}, rot: {x: -0.15, y: 0, z: -0.41}, scale: 1.5 }
-                ];
-
-                let loadedCount = 0;
-
-                // 2. MUAT FILE ANIMASI TERLEBIH DAHULU
-                loader.load(animPath + 'walking.glb', (gltf) => {
-                    if (gltf.animations.length > 0) {
-                        walkingClip = gltf.animations[0];
-                        console.log("Animasi Walking Berhasil Dimuat");
-                    }
-                }, undefined, (error) => {
-                    console.error("Gagal memuat animasi jalan:", error);
-                });
-
-                // 3. MUAT SEMUA MODEL
-                assets.forEach(asset => {
-                    loader.load(modelPath + asset.file, (gltf) => {
-                        const model = gltf.scene;
-                        model.name = asset.name;
-                        model.position.set(asset.pos.x, asset.pos.y, asset.pos.z);
-                        model.rotation.set(asset.rot.x, asset.rot.y, asset.rot.z);
-                        
-                        const s = asset.scale || 1.0; 
-                        model.scale.set(s, s, s);
-                        model.userData.initialZ = asset.pos.z; 
-
-                        model.traverse(node => {
-                            if (node.isMesh) {
-                                node.castShadow = true;
-                                node.receiveShadow = true;
-                                if (node.material) {
-                                    node.material.transparent = false;
-                                    node.material.alphaTest = 0.5;
-                                    node.material.depthWrite = true;
-                                    node.material.side = THREE.DoubleSide;
-                                }
-                            }
-                        });
-
-                        // LOGIKA PEMASANGAN ANIMASI
-                        if (asset.name === 'dante') {
-                            danteModel = model;
-                            // Gunakan interval singkat untuk memastikan walkingClip sudah siap
-                            const waitForAnim = setInterval(() => {
-                                if (walkingClip) {
-                                    const mixer = new THREE.AnimationMixer(danteModel);
-                                    const action = mixer.clipAction(walkingClip);
-                                    action.play();
-                                    mixers.push(mixer);
-                                    clearInterval(waitForAnim);
-                                    console.log("Animasi dipasang ke Dante");
-                                }
-                            }, 100);
-                        } 
-                        else if (asset.name === 'vergil') {
-                            vergilModel = model;
-                            // Jika Vergil nantinya punya animasi bawaan di file-nya sendiri
-                            if (gltf.animations.length > 0) {
-                                const mixer = new THREE.AnimationMixer(vergilModel);
-                                mixer.clipAction(gltf.animations[0]).play();
-                                mixers.push(mixer);
-                            }
-                        }
-                        // Model lain yang mungkin punya animasi internal
-                        else if (gltf.animations.length > 0) {
-                            const mixer = new THREE.AnimationMixer(model);
-                            mixer.clipAction(gltf.animations[0]).play();
-                            mixers.push(mixer);
-                        }
-
-                        scene.add(model);
-
-                        loadedCount++;
-                        if(loadedCount === assets.length) {
-                            document.getElementById('loader').style.display = 'none';
-                            document.getElementById('menu-buttons').style.display = 'flex';
-                        }
-                    });
-                });
-            }
-
-            // --- LOGIC CONTROL ---
-
-            function startMode(mode) {
-                currentMode = mode;
-                time = 0; // Reset waktu ke nol
-
-                // 1. Reset Audio
-                if (sound && sound.isPlaying) sound.stop();
-                
-                // 2. Transisi UI (Menu ke In-Game)
-                document.getElementById('main-menu').style.opacity = '0';
-                setTimeout(() => { 
-                    document.getElementById('main-menu').style.display = 'none'; 
-                }, 500);
+            // Events
+            window.addEventListener('resize', () => { camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+            window.startGame = (m) => {
+                mode = m; time = 0;
+                document.getElementById('console-overlay').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'block';
-
-                // 3. Reset Posisi Dante (Agar tidak tertinggal di posisi terakhir adegan sebelumnya)
-                if (danteModel && danteModel.userData.initialZ !== undefined) {
-                    danteModel.position.set(-20, 0, danteModel.userData.initialZ);
-                }
+                video.muted = false;
                 
-                // 4. Reset Posisi Vergil (Kembali duduk di lantai/kursi)
-                if (vergilModel) {
-                    vergilModel.position.set(-20, 0, 40);
+                if(danteModel) {
+                    danteModel.position.set(-20, 0, 15);
+                    playDanteAnim('Stand');
+                }
+                if(vergilModel) {
+                    // FIX POSISI: Maju dikit ke 40.8 agar tidak kena kursi saat berdiri
+                    vergilModel.position.set(-20, 0, 40.8);
                     vergilModel.rotation.set(0, 0, 0);
+                    playVergilAnim('Sit', 0); // Langsung duduk
                 }
-
-                // 5. Pengaturan Spesifik Per Mode
-                const debugTimer = document.getElementById('debug-timer');
                 
-                if (mode === 'cinematic') {
-                    // Mode Trailer
-                    debugTimer.style.display = 'block'; // Tampilkan timer pengecekan
-                    debugTimer.innerText = "TIME: 0.00s";
-                    video.currentTime = 0;
-                    video.pause();
-                    videoMesh.visible = false;
+                if(m === 'freecam') { camera.position.set(0, 10, 50); camera.lookAt(0,0,0); }
+                animate();
+            };
+        }
 
-                    document.getElementById('mode-title').innerText = 'CINEMATIC TRAILER';  
-                    document.getElementById('mode-desc').innerText = 'Press 1, 2, 3, or 4 to skip scenes';
-                    document.getElementById('controls-hint').style.display = 'none';
+        // --- CLEANERS ---
+        function sanitizeBoneName(name) { return name.replace('mixamorig', '').replace(':', ''); }
+        
+        function sanitizeModel(model) {
+            model.traverse((child) => {
+                if (child.isBone) child.name = sanitizeBoneName(child.name);
+            });
+        }
 
-                } else {
-                    // Mode Freecam
-                    debugTimer.style.display = 'none'; // Sembunyikan timer
-                    videoMesh.visible = false;
-                    
-                    document.getElementById('mode-title').innerText = 'FREE CAMERA';
-                    document.getElementById('mode-desc').innerText = 'Fly Mode Enabled';
-                    document.getElementById('controls-hint').style.display = 'block';
-                    
-                    // Set posisi awal kamera untuk terbang
-                    camera.position.set(0, 15, 60); 
-                    camera.rotation.set(0, 0, 0); 
-                }
+        function sanitizeClip(clip) {
+            const safeTracks = [];
+            clip.tracks.forEach((track) => {
+                const parts = track.name.split('.');
+                const boneName = sanitizeBoneName(parts[0]);
+                const prop = parts[1];
+                if (clip.name.toLowerCase().includes('stand') && prop === 'position') return; 
+                track.name = boneName + '.' + prop;
+                safeTracks.push(track);
+            });
+            clip.tracks = safeTracks;
+            return clip;
+        }
+
+        // --- LOAD ASSETS ---
+        function loadAssets() {
+            const loader = new GLTFLoader();
+            const data = {};
+            const assets = [
+                { id: 'walk', path: 'assets/animations/dante_walking.glb' },
+                { id: 'stand', path: 'assets/animations/dante_standing.glb' },
+                { id: 'vergil_stand', path: 'assets/animations/vergil_standing.glb' }, 
+                { id: 'vergil_sit', path: 'assets/animations/vergil_sit.glb' },
+                { id: 'chair', path: 'assets/models/plastic_chair.glb' },
+                { id: 'map', path: 'assets/models/walmart.glb' },
+                { id: 'yamato', path: 'assets/models/vergils_sword.glb' },
+                { id: 'rebellion', path: 'assets/models/dantes_sword.glb' }
+            ];
+
+            let count = 0;
+            assets.forEach(a => {
+                loader.load(a.path, (gltf) => {
+                    data[a.id] = gltf;
+                    log(`Loaded: ${a.id}`);
+                    count++;
+                    if(count === assets.length) setupScene(data);
+                }, undefined, (e) => {
+                    log(`GAGAL LOAD: ${a.path} (${e.message})`, 'error');
+                    count++;
+                    if(count === assets.length) setupScene(data);
+                });
+            });
+        }
+
+        function setupScene(data) {
+            log("Setting up Scene...");
+
+            if(data.map) { const m=data.map.scene; m.rotation.y=-Math.PI/2; scene.add(m); }
+            if(data.chair) { const c=data.chair.scene; c.position.set(-20,0,40); c.scale.set(2,2,2); scene.add(c); }
+            if(data.yamato) { const y=data.yamato.scene; y.position.set(30,3,35); y.scale.set(5,5,5); scene.add(y); }
+            if(data.rebellion) { const r=data.rebellion.scene; r.name='rebellion'; r.position.set(33,1,40); r.scale.set(1.5,1.5,1.5); scene.add(r); }
+
+            // === DANTE ===
+            if(data.walk) {
+                danteModel = data.walk.scene;
+                sanitizeModel(danteModel);
+                danteModel.position.set(-20, 0, 15);
+                danteModel.scale.set(1.6, 1.6, 1.6);
+                
+                danteModel.traverse(o => { 
+                    if(o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } 
+                });
+                scene.add(danteModel);
+
+                danteMixer = new THREE.AnimationMixer(danteModel);
+                mixers.push(danteMixer);
+
+                if(data.walk.animations.length > 0) danteActions['Walk'] = danteMixer.clipAction(sanitizeClip(data.walk.animations[0]));
+                if(data.stand && data.stand.animations.length > 0) danteActions['Stand'] = danteMixer.clipAction(sanitizeClip(data.stand.animations[0]));
+                if(danteActions['Stand']) playDanteAnim('Stand');
             }
-            function showMenu() {
-                currentMode = 'menu';
-                if (sound && sound.isPlaying) sound.stop();
-                document.getElementById('main-menu').style.display = 'flex';
-                setTimeout(() => { document.getElementById('main-menu').style.opacity = '1'; }, 10);
-                document.getElementById('ui-layer').style.display = 'none';
-            }
 
-            function onResize() {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-
-            function animate() {
-                requestAnimationFrame(animate);
-                const delta = clock.getDelta();
-
-                // 1. UPDATE ANIMATION (Model Characters)
-                for (const mixer of mixers) mixer.update(delta);
-
-                // 2. CINEMATIC LOGIC
-                if (currentMode === 'cinematic') {
-                    time += delta;
-
-                    const timerUI = document.getElementById('debug-timer');
-                        if (timerUI) {
-                            timerUI.innerText = "TIME: " + time.toFixed(2) + "s (Press 1-4 to Jump)";
-                        }
-
-                    // SINKRONISASI AUDIO AWAL
-                    if (time >= 2.0 && !sound.isPlaying && sound.buffer) {
-                        sound.play();
-                    }
-
-                    // --- ADEGAN 1: DANTE WALK (0.0 - 8.5) ---
-                    if (time < 8.5) {
-                        if (danteModel) {
-                            if (time < 4.0) danteModel.position.z += delta * 1.5;
-                            else if (time >= 5.5) danteModel.position.z += delta * 1.0;
-
-                            const zoomMovement = time * 0.4;
-                            camera.position.set(-20, 3.5, 32 - zoomMovement);
-                            camera.lookAt(-20, 3, danteModel.position.z);
-                        }
-                    }
-                    
-                    // --- ADEGAN 2: CLOCK VIDEO (8.5 - 12.2) ---
-                    else if (time < 12.2) {
-                        videoMesh.visible = true;
+            // === VERGIL (FIX VISUAL & POSISI) ===
+            if(data.vergil_stand) {
+                log("Configuring Vergil...");
+                vergilModel = data.vergil_stand.scene; 
+                sanitizeModel(vergilModel);
+                
+                // FIX POSISI: Sedikit maju dari kursi (Z = 40.8)
+                vergilModel.position.set(-20, 0, 40.8);
+                vergilModel.scale.set(0.2, 0.2, 0.2); 
+                
+                vergilModel.traverse(o => { 
+                    if(o.isMesh) { 
+                        o.castShadow = true; 
+                        o.receiveShadow = true; 
+                        o.frustumCulled = false;
                         
-                        // Pastikan posisi Y videoMesh dan Camera sama (misal: 5)
-                        const targetY = 5; 
-                        
-                        videoMesh.position.set(-20, targetY, 25); 
-                        camera.position.set(-20, targetY, 31); // Jarak 10 unit dari video
-                        
-                        // Paksa kamera menatap tepat ke tengah bidang video
-                        camera.lookAt(-20, targetY, 25);
-
-                        if (video.paused) video.play();
-                    }
-
-                    // --- ADEGAN 3: DANTE APPROACHING (12.2 - 13.2) ---
-                    // Hanya berlangsung 1 detik saja
-                    else if (time < 13.2) {
-                        videoMesh.visible = false;
-                        if (!video.paused) video.pause();
-
-                        if (danteModel) {
-                            // Dante jalan cepat mendekat
-                            danteModel.position.z += delta * 3.0; 
-                            
-                            // Kamera mengikuti dari belakang punggung Dante
-                            camera.position.set(-18.5, 2.5, danteModel.position.z - 5);
-                            camera.lookAt(-20, 1.5, 40); 
+                        // === FIX MATERIAL WAJAH & RAMBUT ===
+                        if(o.material) {
+                            o.material.depthWrite = true;       // Paksa tulis depth agar tidak tembus
+                            o.material.transparent = false;     // Matikan transparent murni
+                            o.material.alphaTest = 0.5;         // Gunakan alpha cut untuk rambut
+                            o.material.side = THREE.DoubleSide; // Render dua sisi
                         }
                     } 
+                });
+                scene.add(vergilModel);
 
-                    // --- ADEGAN 4: VERGIL SITTING (13.2 - 17.0) ---
-                    else if (time < 17.0) {
-                        if (danteModel) danteModel.position.z = 33;
+                vergilMixer = new THREE.AnimationMixer(vergilModel);
+                mixers.push(vergilMixer);
 
-                        const zoomTime = time - 13.2;
-                        camera.position.set(-20, 1.8, 34 + (zoomTime * 0.4));
-                        camera.lookAt(-20, 1.2, 40);
-                    }
-
-                    // --- ADEGAN 5: THE CONFRONTATION (17.0 - 24.0) ---
-                    else if (time < 24.0) {
-                        const sceneTime = time - 17.0;
-                        if (danteModel) danteModel.position.z = 33;
-
-                        // Kamera Orbit
-                        const orbitSpeed = -(sceneTime * 0.10) + (Math.PI * 0.4); 
-                        const radius = 3.5; // Radius sedikit diperlebar agar tidak terlalu dekat
-                        
-                        camera.position.x = -20 + Math.sin(orbitSpeed) * radius;
-                        camera.position.z = 40 + Math.cos(orbitSpeed) * radius;
-                        
-                        // PERBAIKAN: Posisi Y dinaikkan ke 2.5 (sebelumnya 1.6) agar kepala Vergil terlihat
-                        camera.position.y = 3.5; 
-                        
-                        // Kamera tetap menatap ke arah Vergil (koordinat 40) tapi sedikit lebih tinggi
-                        camera.lookAt(-20, 3, 40);
-                    }
-
-                    // --- ADEGAN 6: VERGIL TURN AROUND (Disesuaikan durasi ke 29.0) ---
-                    else if (time < 29.0) {
-                        if (vergilModel) {
-                            if (vergilModel.rotation.y < Math.PI) {
-                                vergilModel.rotation.y += delta * 1.8; // Kecepatan sesuai permintaanmu
-                            }
-                            const sceneTime = time - 24.0;
-                            const zoomRadius = Math.max(3.0, 5.0 - (sceneTime * 0.2));
-                            camera.position.set(-20, 3.5, 40 - zoomRadius);
-                            camera.lookAt(-20, 3, 40); 
-                        }
-                    }
-
-                    // --- ADEGAN 7: DANTE'S RESOLVE (29.0 - 34.5) ---
-                    else if (time < 34.5) {
-                        const rebellion = scene.getObjectByName('rebellion');
-
-                        if (danteModel) {
-                            danteModel.position.set(-20, 0, 33);
-                            danteModel.rotation.y = 0; 
-                        }
-
-                        if (time < 33.0) {
-                            if (rebellion) rebellion.visible = false;
-
-                            const zoomProgress = (time - 29.0) / 4.0; 
-                            const camZ = 38 - (zoomProgress * 2.5); 
-                            
-                            camera.position.set(-20, 3.5, camZ); 
-                            camera.lookAt(-20, 3.0, 33); 
-                        } 
-                        else {
-                            if (rebellion) {
-                                rebellion.visible = true;
-                                // Kita taruh pedang sedikit lebih ke depan (Z: 33.5) 
-                                // dan di samping kanan dante (X: -21.0)
-                                rebellion.position.set(-20.5, 5.4, 33.05); 
-                                rebellion.rotation.set(-0.15, 0, Math.PI); // Putar sedikit agar mata pedang terlihat
-                                
-                                // Debugging: Muncul di console jika pedang berhasil dipanggil
-                                if (time === 33.0) console.log("Sword should be visible now!");
-                            }
-
-                            camera.position.x = THREE.MathUtils.lerp(camera.position.x, -18.5, 0.07);
-                            camera.lookAt(-21.0, 2.8, 33.5); 
-                        }
-                    }
-
-                    // --- ADEGAN 8: VERGIL'S TENSION & SHAKE (34.5 - 38.5) ---
-                    else if (time < 38.5) {
-                        if (vergilModel) {
-                            vergilModel.rotation.y = Math.PI; 
-                            vergilModel.position.set(-20, 0, 40);
-                        }
-
-                        // 1. Posisi Kamera: Samping Kiri & Sangat Dekat
-                        // X: -21.5 (Sisi kiri Vergil), Z: 38.8 (Hanya 1.2 unit di depan Vergil)
-                        const baseCamX = -21; 
-                        const baseCamY = 3.5; 
-                        const baseCamZ = 38.5; // Sangat maju agar fokus ke wajah/bahu saja
-
-                        // 2. Efek Camera Shaking (Sangat intens karena jarak dekat)
-                        const shakeIntensity = 0.01; 
-                        const shakeX = (Math.random() - 0.1) * shakeIntensity;
-                        const shakeY = (Math.random() - 0.1) * shakeIntensity;
-                        const shakeZ = (Math.random() - 0.1) * shakeIntensity;
-
-                        camera.position.set(
-                            baseCamX + shakeX, 
-                            baseCamY + shakeY, 
-                            baseCamZ + shakeZ
-                        );
-
-                        // 3. Fokus Pandangan: Tajam ke area mata Vergil
-                        // Karena kamera di X: -21.5, kita arahkan ke X: -20 untuk angle serong yang tajam
-                        camera.lookAt(-20, 3, 40);
-                    }
-
-                    // --- ADEGAN 9: DANTE'S FRONT VIEW (FIXED DIRECTION) ---
-                    else if (time < 42.0) {
-                        if (danteModel) {
-                            danteModel.position.set(-20, 0, 33);
-                            danteModel.rotation.y = 0; // Dante menghadap ke arah Vergil (Z+)
-                        }
-
-                        // 1. Posisi Kamera: Di antara Dante dan Vergil, menghadap Dante
-                        const baseCamX = -20.5; 
-                        const baseCamY = 3.5; 
-                        // Dante di 33, Vergil di 40. Kita taruh kamera di 34.8 (tepat di depan muka Dante)
-                        const baseCamZ = 34.8; 
-
-                        // 2. Efek Shaking (Sesuai kode Anda)
-                        const shakeIntensity = 0.01; 
-                        const shakeX = (Math.random() - 0.1) * shakeIntensity;
-                        const shakeY = (Math.random() - 0.1) * shakeIntensity;
-                        const shakeZ = (Math.random() - 0.1) * shakeIntensity;
-
-                        camera.position.set(
-                            baseCamX + shakeX, 
-                            baseCamY + shakeY, 
-                            baseCamZ + shakeZ
-                        );
-
-                        // 3. Fokus Pandangan: Kembali ke arah Dante (Z: 33)
-                        camera.lookAt(-20, 3, 33);
-                    }
-
-                    // --- ADEGAN 10: DANTE RIGHT SIDE TILT (42.0 - 47.0) ---
-                    else if (time < 47.0) {
-                        const sceneTime = time - 42.0; 
-                        const progress = sceneTime / 5.0; // Transisi halus selama 5 detik
-
-                        if (danteModel) {
-                            danteModel.position.set(-20, 0, 33);
-                            danteModel.rotation.y = 0;
-                        }
-
-                        // 1. Posisi Kamera: Statis di Sisi Kanan Dante
-                        // Berada di X: -21.8 (Sisi kanan tubuh Dante)
-                        camera.position.set(-20.5, 3.5, 33.3);
-
-                        // 2. Logika Tilt ke Kanan
-                        // Target pandangan bergeser dari wajah (-20) semakin ke arah kanan luar (-25)
-                        const startLookX = -15;
-                        const endLookX = -10; 
-                        const currentLookX = startLookX + (progress * (endLookX - startLookX));
-
-                        // Lensa kamera menoleh perlahan ke arah kanan
-                        camera.lookAt(currentLookX, 3.0, 32);
-                    }
-
-                    // --- ADEGAN 11: VERGIL'S CLOSE-UP TILT (47.0 - 50.0) ---
-                    else if (time < 50.0) {
-                        const sceneTime = time - 47.0; 
-                        const progress = sceneTime / 3.0; // Durasi 3 detik
-
-                        if (vergilModel) {
-                            vergilModel.position.set(-20, 0, 40);
-                            vergilModel.rotation.y = Math.PI; 
-                        }
-
-                        // 1. Posisi Kamera: Statis di Sisi Kiri Vergil
-                        // Menggunakan koordinat yang mirip dengan Dante agar konsisten
-                        camera.position.set(-20.5, 3.5, 39.7); 
-
-                        // 2. Logika Tilt: DARI KANAN KE KIRI
-                        // Start di arah kanan (X positif/lebih besar) ke arah kiri (X negatif/lebih kecil)
-                        const startLookX = -10; // Sisi kanan frame
-                        const endLookX = -15;   // Sisi kiri frame
-                        const currentLookX = startLookX + (progress * (endLookX - startLookX));
-
-                        // Lensa kamera menoleh perlahan dari kanan ke kiri
-                        // Target Z di 41 agar kamera tetap menghadap ke arah model Vergil
-                        camera.lookAt(currentLookX, 3.0, 41);
-                    }
-
-                    // --- ADEGAN 12: CINEMATIC SIDE-RIGHT ORBIT (50.0 - 52.5) ---
-                    else if (time < 52.5) {
-                        const sceneTime = time - 50.0;
-                        const progress = sceneTime / 2.5; 
-
-                        if (danteModel) danteModel.position.set(-20, 0, 33);
-                        if (vergilModel) vergilModel.position.set(-20, 0, 40);
-
-                        // 1. Parameter Orbit
-                        const pivotX = -20;
-                        const pivotZ = 36.5; 
-                        const radius = 9; // Sedikit lebih jauh agar keduanya masuk frame dengan cantik
-
-                        // 2. Sudut Orbit (Sisi Kanan Dante)
-                        // Kita gunakan startAngle yang membuat kamera berada di samping kanan (X lebih kecil dari -20)
-                        // Penambahan progress * 0.05 untuk rotasi yang sangat halus
-                        const startAngle = 3.8; 
-                        const currentAngle = startAngle + (progress * 0.08); 
-
-                        // 3. Posisi Kamera
-                        // Menggunakan Sin dan Cos untuk menjaga jarak radius tetap konsisten saat orbit
-                        const camX = pivotX + Math.sin(currentAngle) * radius;
-                        const camZ = pivotZ + Math.cos(currentAngle) * radius;
-                        const camY = 5.5; // Posisi atas (High Angle)
-
-                        camera.position.set(camX, camY, camZ);
-
-                        // 4. Fokus Pandangan: Di tengah antara Dante dan Vergil
-                        camera.lookAt(pivotX, 2.5, pivotZ);
-                    }
-
-                    // --- ADEGAN 13: DANTE'S ADVANCE & SWORD REVEAL (52.5 - 56.0) ---
-                    else if (time < 56.0) {
-                        const sceneTime = time - 52.5;
-
-                        // --- 1. LOGIKA GERAKAN DANTE ---
-                        if (danteModel) {
-                            let danteZ = 33;
-                            if (time < 53.5) {
-                                const moveProgress = (time - 52.5) / 1.0;
-                                danteZ = 33 + (moveProgress * 0.8);
-                            } else {
-                                danteZ = 33.8;
-                            }
-                            danteModel.position.set(-20, 0, danteZ);
-                            danteModel.rotation.y = 0;
-                        }
-
-                        // --- 2. LOGIKA KAMERA ---
-                        
-                        // Posisi Tinggi Kamera Baru (Dinaikkan lagi)
-                        const fixedY = 3; 
-
-                        // A. Detik 52.5 - 54.0: Depan & Tilt ke Pedang
-                        if (time < 54.0) {
-                            const tiltProgress = Math.max(0, (time - 53.0) / 1.0); 
-
-                            // Posisi Kamera: Depan Dante
-                            const camX = -20; 
-                            const camZ = 35.5; 
-                            camera.position.set(camX, fixedY, camZ);
-
-                            // Tilt Pandangan: Dari wajah ke arah pedang (kiri kamera)
-                            const startLookX = -20;
-                            const endLookX = -21.2; 
-                            const currentLookX = startLookX + (tiltProgress * (endLookX - startLookX));
-                            
-                            camera.lookAt(currentLookX, 3.3, 33.8);
-
-                        } 
-                        // B. Detik 54.0 - 56.0: Slow Drift (Perpindahan Sangat Kecil)
-                        else {
-                            const moveSideProgress = (time - 54.0) / 2.0;
-
-                            // Jarak perpindahan mikro agar terlihat sangat lambat
-                            const startCamX = -20;
-                            const endCamX = -19.6; // Hanya geser 0.4 unit
-                            const currentCamX = startCamX + (moveSideProgress * (endCamX - startCamX));
-                            
-                            const startCamZ = 35.5;
-                            const endCamZ = 35.4; // Hanya geser 0.1 unit
-                            const currentCamZ = startCamZ + (moveSideProgress * (endCamZ - startCamZ));
-
-                            camera.position.set(currentCamX, fixedY, currentCamZ);
-                            
-                            // Fokus tetap mengunci
-                            camera.lookAt(-20.5, 3.3, 33.8);
-                        }
-                    }
-
-                    // --- ADEGAN 14: VERGIL'S FINAL REVEAL (56.0 - 59.0) ---
-                    else if (time < 59.0) {
-                        const sceneTime = time - 56.0;
-
-                        if (vergilModel) {
-                            vergilModel.position.set(-20, 0, 40);
-                            vergilModel.rotation.y = Math.PI; // Vergil tetap menghadap Dante
-                        }
-
-                        // 1. Posisi Kamera: Depan Vergil, Sangat Dekat
-                        // Vergil di Z: 40. Kita taruh kamera di Z: 38.8 (jarak 1.2 unit saja)
-                        const camX = -20;
-                        const camY = 3.2; // Tinggi kamera tetap di area dada/wajah
-                        const camZ = 38.8; 
-                        camera.position.set(camX, camY, camZ);
-
-                        // 2. Logika Vertical Tilt (Mendongak)
-                        // Detik 56 - 57: Tilt dari perut ke wajah
-                        let currentLookY;
-                        if (time < 57.0) {
-                            const tiltProgress = (time - 56.0) / 1.0; // Durasi 1 detik
-                            const startLookY = 1.0; // Area perut/pinggang
-                            const endLookY = 3.5;   // Area wajah
-                            currentLookY = startLookY + (tiltProgress * (endLookY - startLookY));
-                        } else {
-                            // Detik 57 - 59: Kamera mengunci di wajah (diam/hold)
-                            currentLookY = 3.5;
-                        }
-
-                        // Kamera menghadap ke depan (Z: 40 arah model Vergil)
-                        camera.lookAt(-20, currentLookY, 40);
-                    }
-                }
+                if(data.vergil_stand.animations.length > 0) vergilActions['Stand'] = vergilMixer.clipAction(sanitizeClip(data.vergil_stand.animations[0]));
                 
-                // 3. FREE CAMERA LOGIC (Update Speed)
-                else if (currentMode === 'freecam') {
-                    // Gunakan Shift untuk boost 3x lipat
-                    const actualSpeed = (keys.shift ? moveSpeedBase * 3 : moveSpeedBase) * delta;
-
-                    if (keys.w) camera.translateZ(-actualSpeed);
-                    if (keys.s) camera.translateZ(actualSpeed); 
-                    if (keys.a) camera.translateX(-actualSpeed);
-                    if (keys.d) camera.translateX(actualSpeed);
-                    
-                    if (keys.e) camera.position.y += actualSpeed;
-                    if (keys.q) camera.position.y -= actualSpeed;
-
-                    if (camera.position.y < 0.2) camera.position.y = 0.2;
+                if(data.vergil_sit && data.vergil_sit.animations.length > 0) {
+                    const clip = sanitizeClip(data.vergil_sit.animations[0]);
+                    vergilActions['Sit'] = vergilMixer.clipAction(clip);
+                    vergilActions['Sit'].setLoop(THREE.LoopOnce); 
+                    vergilActions['Sit'].clampWhenFinished = true;
                 }
+                playVergilAnim('Sit', 0);
 
-                renderer.render(scene, camera);
+            } else {
+                log("CRITICAL: vergil_standing.glb tidak ditemukan!", 'error');
             }
 
-            init();
-        </script>
-    </body>
-    </html>
+            log("READY TO PLAY!");
+            document.getElementById('start-area').style.display = 'block';
+        }
+
+        // Helper Animations
+        function playDanteAnim(name) {
+            if(!danteActions[name]) return;
+            const next = danteActions[name];
+            if(activeDanteAction === next) return;
+            if(activeDanteAction) activeDanteAction.fadeOut(0.5);
+            next.reset().fadeIn(0.5).play();
+            activeDanteAction = next;
+        }
+
+        // Helper Vergil
+        function playVergilAnim(name, fadeDuration = 1.0) {
+            if(!vergilActions[name]) return;
+            const next = vergilActions[name];
+            if(activeVergilAction === next) return;
+            
+            if(activeVergilAction) activeVergilAction.fadeOut(fadeDuration);
+            next.reset().fadeIn(fadeDuration).play();
+            activeVergilAction = next;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            mixers.forEach(m => m.update(delta));
+
+            if(mode === 'cinematic') {
+                time += delta;
+                document.getElementById('debug-timer').innerText = "TIME: " + time.toFixed(2);
+                if(time>2 && !sound.isPlaying && sound.buffer) sound.play();
+
+                // --- DANTE TIMELINE (AWAL) ---
+                if(time < 8.5) {
+                    playDanteAnim('Walk');
+                    if(danteModel) {
+                        if(time<4) danteModel.position.z += delta * 1.5;
+                        else if(time>=5.5) danteModel.position.z += delta * 1.0;
+                        camera.position.set(-20, 3.5, 32-(time*0.4)); camera.lookAt(-20, 3, danteModel.position.z);
+                    }
+                } 
+                else if(time < 12.2) {
+                    playDanteAnim('Stand');
+                    videoMesh.visible=true; videoMesh.position.set(-20,5,25);
+                    camera.position.set(-20,5,31); camera.lookAt(-20,5,25);
+                    if(video.paused) video.play();
+                } 
+                else if(time < 13.2) {
+                    playDanteAnim('Walk');
+                    videoMesh.visible=false; video.pause();
+                    if(danteModel) {
+                        danteModel.position.z += delta * 3.0;
+                        camera.position.set(-18.5, 2.5, danteModel.position.z - 5); camera.lookAt(-20, 1.5, 40);
+                    }
+                } 
+                else if(time < 17.0) {
+                    playDanteAnim('Stand'); if(danteModel) danteModel.position.z=33;
+                    const zoomTime = time - 13.2;
+                    camera.position.set(-20, 1.8, 34 + (zoomTime * 0.4));
+                    camera.lookAt(-20, 1.2, 40);
+                }
+                else if(time < 24.0) {
+                    // Kamera Muter
+                    const t = time - 17.0;
+                    const speed = -(t * 0.1) + (Math.PI * 0.4);
+                    camera.position.set(-20 + Math.sin(speed)*3.5, 3.5, 40 + Math.cos(speed)*3.5);
+                    camera.lookAt(-20, 3, 40);
+
+                    // --- VERGIL BERDIRI ---
+                    // 21.5s: Mulai berdiri dengan CEPAT (0.4s fade)
+                    if (time > 21.5) { 
+                        playVergilAnim('Stand', 0.4); 
+                    } else {
+                        playVergilAnim('Sit', 0.5);
+                    }
+                }
+                else if(time < 29.0) {
+                    // Vergil putar badan
+                    playVergilAnim('Stand', 0.2);
+                    if(vergilModel && vergilModel.rotation.y < Math.PI) vergilModel.rotation.y += delta * 1.8;
+                    
+                    const t = time - 24.0;
+                    camera.position.set(-20, 3.5, 40 - Math.max(3.0, 5.0 - t*0.2));
+                    camera.lookAt(-20, 3, 40);
+                }
+                else if(time < 34.5) {
+                    // Dante Pedang
+                    const reb = scene.getObjectByName('rebellion');
+                    if(time < 33.0) {
+                        if(reb) reb.visible = false;
+                        camera.position.set(-20, 3.5, 38 - ((time-29)*0.6)); camera.lookAt(-20, 3.0, 33);
+                    } else {
+                        if(reb) { reb.visible = true; reb.position.set(-20.5, 5.4, 33.05); reb.rotation.set(-0.15,0,Math.PI); }
+                        camera.position.set(-18.5, 3.5, 35.5); camera.lookAt(-21.0, 2.8, 33.5);
+                    }
+                }
+                else if(time < 38.5) {
+                    if(vergilModel) vergilModel.rotation.y = Math.PI;
+                    camera.position.set(-21 + (Math.random()-0.5)*0.01, 3.5 + (Math.random()-0.5)*0.01, 38.5);
+                    camera.lookAt(-20, 3, 40);
+                }
+                else if(time < 42.0) {
+                    camera.position.set(-20.5 + (Math.random()-0.5)*0.01, 3.5 + (Math.random()-0.5)*0.01, 34.8);
+                    camera.lookAt(-20, 3, 33);
+                }
+
+                // === LOGIKA BARU SESUAI REQUEST ===
+                
+                // 1. "It's the memory I have..." -> Zoom DANTE dari KIRI
+                else if (time < 45.0) {
+                    playDanteAnim('Stand');
+                    // Posisi kamera di X -22 (Kiri dante) melihat ke wajahnya
+                    camera.position.set(-22.0, 1.75, 33.5);
+                    camera.lookAt(-20, 1.75, 33.0);
+                }
+                // 2. Zoom VERGIL dari KANAN
+                else if (time < 48.0) {
+                    // Posisi kamera di X -18 (Kanan vergil yg sedang hadap Dante)
+                    camera.position.set(-18.5, 1.75, 40.0);
+                    camera.lookAt(-20, 1.75, 40.8);
+                }
+                // 3. Zoom Out (Lihat Berdua) + Dante Jalan Dikit
+                else if (time < 53.0) {
+                    if(time < 50.0) {
+                        playDanteAnim('Walk'); 
+                        danteModel.position.z += delta * 0.8; // Jalan pelan
+                    } else {
+                        playDanteAnim('Stand');
+                    }
+                    camera.position.set(-26, 2.5, 37); // Shot dari samping jauh
+                    camera.lookAt(-20, 1.5, 37);
+                }
+                // 4. Zoom DANTE dari DEPAN
+                else if (time < 56.0) {
+                    playDanteAnim('Stand');
+                    camera.position.set(-20, 1.7, 34.5); // Depan muka Dante
+                    camera.lookAt(-20, 1.65, 33.0);
+                }
+                // 5. Zoom VERGIL Terakhir
+                else {
+                    camera.position.set(-20, 1.7, 39.5); // Depan muka Vergil
+                    camera.lookAt(-20, 1.65, 40.8);
+                }
+
+            } else if (mode === 'freecam') {
+                const spd = (keys.shift ? 24 : 8) * delta;
+                if(camera) {
+                    if(keys.w) camera.translateZ(-spd); if(keys.s) camera.translateZ(spd);
+                    if(keys.a) camera.translateX(-spd); if(keys.d) camera.translateX(spd);
+                    if(keys.q) camera.position.y += spd; if(keys.e) camera.position.y -= spd;
+                }
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
