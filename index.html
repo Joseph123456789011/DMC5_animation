@@ -79,16 +79,46 @@
         }
 
         // --- INPUT HANDLING ---
-        window.addEventListener('keydown', (e) => {
+       window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if (keys.hasOwnProperty(key)) keys[key] = true;
             if (e.key === 'Shift') keys.shift = true;
+
+            // Fitur Timeskip Adegan (Angka 1-9 dan 0)
+            if (mode === 'cinematic') {
+                const skipMap = {
+                    '1': 0, '2': 8.5, '3': 12.2, '4': 13.2, '5': 17.0,
+                    '6': 24.0, '7': 29.0, '8': 34.5, '9': 38.5, '0': 42.0,
+                    '-': 45.0, 
+                    '=': 48.0,   // Adegan 12: Orbit Rotate
+                    '[': 53.0,   // Adegan 13: Dante Close-up Final
+                    ']': 56.0    // Adegan 14: Vergil Close-up Final
+                };
+
+                if (skipMap[e.key] !== undefined) {
+                    time = skipMap[e.key];
+                    
+                    if(vergilModel) {
+                        // Konsistensi posisi Vergil di Z=42 untuk adegan 5 ke atas
+                        if (time >= 21.5) {
+                            vergilModel.position.z = 42; 
+                            vergilModel.rotation.y = (time >= 24) ? Math.PI : 0;
+                        } else {
+                            vergilModel.position.z = 40.0;
+                            vergilModel.rotation.y = 0;
+                        }
+                    }
+                    log(`Jump to Scene ${e.key} (Time: ${time}s)`);
+                }
+            }
         });
         window.addEventListener('keyup', (e) => {
             const key = e.key.toLowerCase();
             if (keys.hasOwnProperty(key)) keys[key] = false;
             if (e.key === 'Shift') keys.shift = false;
         });
+
+        
 
         function init() {
             log("Memulai Three.js...");
@@ -145,11 +175,12 @@
                     playDanteAnim('Stand');
                 }
                 if(vergilModel) {
-                    // FIX POSISI: Maju dikit ke 40.8 agar tidak kena kursi saat berdiri
-                    vergilModel.position.set(-20, 0, 40.8);
+                    // Mulai dari posisi duduk yang pas di kursi
+                    vergilModel.position.set(-20, 0, 40.0);
                     vergilModel.rotation.set(0, 0, 0);
-                    playVergilAnim('Sit', 0); // Langsung duduk
+                    playVergilAnim('Sit', 0);
                 }
+
                 
                 if(m === 'freecam') { camera.position.set(0, 10, 50); camera.lookAt(0,0,0); }
                 animate();
@@ -222,7 +253,7 @@
                 danteModel = data.walk.scene;
                 sanitizeModel(danteModel);
                 danteModel.position.set(-20, 0, 15);
-                danteModel.scale.set(1.6, 1.6, 1.6);
+                danteModel.scale.set(2, 2, 2);
                 
                 danteModel.traverse(o => { 
                     if(o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } 
@@ -316,7 +347,7 @@
                 document.getElementById('debug-timer').innerText = "TIME: " + time.toFixed(2);
                 if(time>2 && !sound.isPlaying && sound.buffer) sound.play();
 
-                // --- DANTE TIMELINE (AWAL) ---
+                // adegan 1(0-8.5s)
                 if(time < 8.5) {
                     playDanteAnim('Walk');
                     if(danteModel) {
@@ -325,12 +356,14 @@
                         camera.position.set(-20, 3.5, 32-(time*0.4)); camera.lookAt(-20, 3, danteModel.position.z);
                     }
                 } 
+                // adegan 2 (8.5-17s)
                 else if(time < 12.2) {
                     playDanteAnim('Stand');
                     videoMesh.visible=true; videoMesh.position.set(-20,5,25);
                     camera.position.set(-20,5,31); camera.lookAt(-20,5,25);
                     if(video.paused) video.play();
                 } 
+                // adegan 3 (12.2-13.2s)
                 else if(time < 13.2) {
                     playDanteAnim('Walk');
                     videoMesh.visible=false; video.pause();
@@ -339,29 +372,35 @@
                         camera.position.set(-18.5, 2.5, danteModel.position.z - 5); camera.lookAt(-20, 1.5, 40);
                     }
                 } 
+                // adegan 4 (13.2-17s)
                 else if(time < 17.0) {
                     playDanteAnim('Stand'); if(danteModel) danteModel.position.z=33;
                     const zoomTime = time - 13.2;
                     camera.position.set(-20, 1.8, 34 + (zoomTime * 0.4));
                     camera.lookAt(-20, 1.2, 40);
                 }
+                // adegan 5 (17-24s)
                 else if(time < 24.0) {
-                    // Kamera Muter
                     const t = time - 17.0;
                     const speed = -(t * 0.1) + (Math.PI * 0.4);
                     camera.position.set(-20 + Math.sin(speed)*3.5, 3.5, 40 + Math.cos(speed)*3.5);
                     camera.lookAt(-20, 3, 40);
 
-                    // --- VERGIL BERDIRI ---
-                    // 21.5s: Mulai berdiri dengan CEPAT (0.4s fade)
                     if (time > 21.5) { 
+                        // POSISI BERDIRI: Maju lebih jauh ke 41.5 agar jubah/kaki aman
+                        if(vergilModel) vergilModel.position.z = 41; 
                         playVergilAnim('Stand', 0.4); 
                     } else {
+                        // POSISI DUDUK: Tetap di 40.0 (pas di kursi)
+                        if(vergilModel) vergilModel.position.z = 40.0;
                         playVergilAnim('Sit', 0.5);
                     }
                 }
+                // adegan 6 (24-29s)
                 else if(time < 29.0) {
-                    // Vergil putar badan
+                    // Vergil tetap di posisi maju saat berputar
+                    if(vergilModel) vergilModel.position.z = 42;
+                    
                     playVergilAnim('Stand', 0.2);
                     if(vergilModel && vergilModel.rotation.y < Math.PI) vergilModel.rotation.y += delta * 1.8;
                     
@@ -369,22 +408,48 @@
                     camera.position.set(-20, 3.5, 40 - Math.max(3.0, 5.0 - t*0.2));
                     camera.lookAt(-20, 3, 40);
                 }
+                // adegan 7 (29-34.5s)
                 else if(time < 34.5) {
-                    // Dante Pedang
                     const reb = scene.getObjectByName('rebellion');
+                    
+                    // Pastikan Vergil tetap di posisi Z=42 agar tidak tabrak kursi
+                    if(vergilModel) vergilModel.position.z = 42;
+
                     if(time < 33.0) {
+                        // --- FASE 1: ZOOM KE DANTE (29s - 33s) ---
                         if(reb) reb.visible = false;
-                        camera.position.set(-20, 3.5, 38 - ((time-29)*0.6)); camera.lookAt(-20, 3.0, 33);
-                    } else {
-                        if(reb) { reb.visible = true; reb.position.set(-20.5, 5.4, 33.05); reb.rotation.set(-0.15,0,Math.PI); }
-                        camera.position.set(-18.5, 3.5, 35.5); camera.lookAt(-21.0, 2.8, 33.5);
+                        
+                        const zoomProgress = (time - 29.0) * 0.6;
+                        camera.position.set(-20, 3.5, 38 - zoomProgress); 
+                        camera.lookAt(-20, 3.0, 33);
+                    } 
+                    else {
+                        // --- FASE 2: PEDANG MUNCUL & TILT ARAH PANDANG (33s - 34.5s) ---
+                        if(reb) { 
+                            reb.visible = true; 
+                            reb.position.set(-20.5, 5.4, 33.05); 
+                            reb.rotation.set(-0.15, 0, Math.PI); 
+                        }
+
+                        // POSISI TETAP: Mengunci posisi terakhir dari fase zoom (sekitar Z = 35.6)
+                        camera.position.set(-20, 3.5, 35.6);
+
+                        // TILT: Hanya mengubah arah pandang (lookAt) secara perlahan ke koordinat pedang
+                        const tiltProgress = (time - 33.0) * 0.8; 
+                        camera.lookAt(
+                            -20 - tiltProgress, // Bergeser ke arah pedang (kiri dari sudut pandang Dante)
+                            3.0 - (tiltProgress * 0.2), // Sedikit menunduk ke arah gagang pedang
+                            33
+                        );
                     }
                 }
+                // adegan 8 (34.5-38.5s)
                 else if(time < 38.5) {
                     if(vergilModel) vergilModel.rotation.y = Math.PI;
                     camera.position.set(-21 + (Math.random()-0.5)*0.01, 3.5 + (Math.random()-0.5)*0.01, 38.5);
                     camera.lookAt(-20, 3, 40);
                 }
+                // adgean 9 (38.5-42s)
                 else if(time < 42.0) {
                     camera.position.set(-20.5 + (Math.random()-0.5)*0.01, 3.5 + (Math.random()-0.5)*0.01, 34.8);
                     camera.lookAt(-20, 3, 33);
@@ -392,40 +457,111 @@
 
                 // === LOGIKA BARU SESUAI REQUEST ===
                 
-                // 1. "It's the memory I have..." -> Zoom DANTE dari KIRI
+                // adegan 10 (42-45s) - Close up Dante
                 else if (time < 45.0) {
                     playDanteAnim('Stand');
-                    // Posisi kamera di X -22 (Kiri dante) melihat ke wajahnya
-                    camera.position.set(-22.0, 1.75, 33.5);
-                    camera.lookAt(-20, 1.75, 33.0);
+                    // Menaikkan Y dari 1.75 ke 2.2 agar sejajar kepala Dante
+                    camera.position.set(-20.5, 3.5, 33.2);
+                    camera.lookAt(-20, 3.5, 33.3);
                 }
-                // 2. Zoom VERGIL dari KANAN
+                // adegan 11 (45-48s) - Close up Vergil (Sisi Kiri)
                 else if (time < 48.0) {
-                    // Posisi kamera di X -18 (Kanan vergil yg sedang hadap Dante)
-                    camera.position.set(-18.5, 1.75, 40.0);
-                    camera.lookAt(-20, 1.75, 40.8);
+                    // Posisi kamera diatur ke X: -21.5 (Sisi kiri Vergil)
+                    // Ketinggian Y: 3.5 sesuai dengan settingan pas Anda di adegan 10
+                    // Posisi Z: 40.5 agar berada sedikit di depan Vergil (Z: 42)
+                    camera.position.set(-20.5, 3.45, 41.7);
+                    
+                    // Kamera menatap ke arah kepala Vergil
+                    camera.lookAt(-20, 3.45, 41.8);
                 }
-                // 3. Zoom Out (Lihat Berdua) + Dante Jalan Dikit
+                // adegan 12 (48-53s) - Orbit Shot Belakang Kanan (Dante Diam)
                 else if (time < 53.0) {
-                    if(time < 50.0) {
-                        playDanteAnim('Walk'); 
-                        danteModel.position.z += delta * 0.8; // Jalan pelan
-                    } else {
-                        playDanteAnim('Stand');
-                    }
-                    camera.position.set(-26, 2.5, 37); // Shot dari samping jauh
-                    camera.lookAt(-20, 1.5, 37);
+                    // Pivot tetap di tengah antara Dante (~Z:33) dan Vergil (Z:42)
+                    const pivotZ = 37.5; 
+                    const pivotX = -20;
+                    const radius = 7.0; 
+                    
+                    // Rotasi orbit sangat pelan
+                    const t = (time - 48.0) * 0.12; 
+                    const angle = t + (Math.PI * 1.1); // Mulai dari belakang kanan Dante
+
+                    camera.position.set(
+                        pivotX + Math.sin(angle) * radius,
+                        3.5, 
+                        pivotZ + Math.cos(angle) * radius
+                    );
+
+                    camera.lookAt(pivotX, 2.8, pivotZ);
+
+                    // --- PERBAIKAN: DANTE TETAP DIAM ---
+                    playDanteAnim('Stand'); 
+                    // Tidak ada danteModel.position.z += delta
                 }
-                // 4. Zoom DANTE dari DEPAN
+                // adegan 13 (53-56s) - Low Angle Dante & Tilt Samping ke Pedang
                 else if (time < 56.0) {
-                    playDanteAnim('Stand');
-                    camera.position.set(-20, 1.7, 34.5); // Depan muka Dante
-                    camera.lookAt(-20, 1.65, 33.0);
+                    const reb = scene.getObjectByName('rebellion');
+                    // Mengambil posisi Z Dante secara dinamis agar kamera tetap presisi
+                    const danteZ = danteModel ? danteModel.position.z : 33;
+                    
+                    if (time < 54.0) {
+                        // --- FASE 1: DANTE JALAN MAJU (53-54s) ---
+                        playDanteAnim('Walk');
+                        if (danteModel) danteModel.position.z += delta * 1.5; 
+                        
+                        // Kamera Low Angle jarak dekat, ikut mundur sedikit sesuai pergerakan Dante
+                        // X: -20 (tengah), Y: 1.5 (bawah), Z: danteZ + 3.0 (dekat di depan)
+                        camera.position.set(-20, 1.5, danteZ + 3.0); 
+                        camera.lookAt(-20, 3.2, danteZ); // Fokus awal ke arah dada/wajah
+                    } 
+                    else {
+                        // --- FASE 2: DANTE DIAM & TILT KE KIRI (54-56s) ---
+                        playDanteAnim('Stand');
+                        
+                        // Posisi kamera diam di tempat (Lock)
+                        camera.position.set(-20, 2, danteZ + 3.0);
+                        
+                        // TILT KE KIRI: Mengubah target pandangan ke arah koordinat pedang di kiri
+                        const tiltProgress = (time - 54.0) * 1; 
+                        camera.lookAt(
+                            -20 - tiltProgress, // Target bergeser ke arah kiri (X negatif)
+                            3.2 - (tiltProgress * 0.2), // Sedikit turun tapi tetap fokus pada tinggi pedang
+                            danteZ
+                        );
+                        
+                        if(reb) reb.visible = true;
+                    }
                 }
-                // 5. Zoom VERGIL Terakhir
+                // adegan 14 (56-59s) - Vergil Close-up & Vertical Tilt
                 else {
-                    camera.position.set(-20, 1.7, 39.5); // Depan muka Vergil
-                    camera.lookAt(-20, 1.65, 40.8);
+                    const vergilZ = vergilModel ? vergilModel.position.z : 42;
+                    
+                    // Pastikan Vergil tetap pada posisi berdiri dan menghadap Dante
+                    playVergilAnim('Stand', 0.2);
+                    if(vergilModel) {
+                        vergilModel.position.z = 42;
+                        vergilModel.rotation.y = Math.PI;
+                    }
+
+                    // POSISI KAMERA: Tetap di level kepala (3.45) agar shot konsisten
+                    // Z: vergilZ - 1.2 (Sangat dekat di depan wajah)
+                    camera.position.set(-20, 3.45, vergilZ - 1.2);
+
+                    if (time < 57.0) {
+                        // --- FASE 1: VERTICAL TILT (56-57s) ---
+                        const tiltProgress = (time - 56.0); // 0 sampai 1
+                        
+                        camera.lookAt(
+                            -20, 
+                            // KITA NAIKKAN AWALNYA: dari 2.0 (pinggang/dada) ke 3.45 (kepala)
+                            // Sebelumnya 1.0 (terlalu bawah/kaki)
+                            2.0 + (tiltProgress * 1.45), 
+                            vergilZ
+                        );
+                    } 
+                    else {
+                        // --- FASE 2: LOCK ON FACE (57-59s) ---
+                        camera.lookAt(-20, 3.45, vergilZ);
+                    }
                 }
 
             } else if (mode === 'freecam') {
