@@ -141,6 +141,7 @@
                 const dir = new THREE.DirectionalLight(0xffffff, 1.5);
                 dir.position.set(10, 20, 10); dir.castShadow = true; scene.add(dir);
 
+                
                 // Audio Video
                 const listener = new THREE.AudioListener(); camera.add(listener);
                 sound = new THREE.Audio(listener);
@@ -248,6 +249,13 @@
             if(data.yamato) { const y=data.yamato.scene; y.position.set(30,3,35); y.scale.set(5,5,5); scene.add(y); }
             if(data.rebellion) { const r=data.rebellion.scene; r.name='rebellion'; r.position.set(33,1,40); r.scale.set(1.5,1.5,1.5); scene.add(r); }
 
+            if(data.yamato) { 
+                const y = data.yamato.scene; 
+                y.name = 'yamato'; // Memberi nama agar bisa dipanggil getObjectByName
+                y.visible = false; // Sembunyikan dulu
+                y.scale.set(1.5, 1.5, 1.5); // Sesuaikan ukuran
+                scene.add(y); 
+            }
             // === DANTE ===
             if(data.walk) {
                 danteModel = data.walk.scene;
@@ -411,37 +419,40 @@
                 // adegan 7 (29-34.5s)
                 else if(time < 34.5) {
                     const reb = scene.getObjectByName('rebellion');
-                    
-                    // Pastikan Vergil tetap di posisi Z=42 agar tidak tabrak kursi
                     if(vergilModel) vergilModel.position.z = 42;
 
                     if(time < 33.0) {
-                        // --- FASE 1: ZOOM KE DANTE (29s - 33s) ---
                         if(reb) reb.visible = false;
-                        
                         const zoomProgress = (time - 29.0) * 0.6;
                         camera.position.set(-20, 3.5, 38 - zoomProgress); 
                         camera.lookAt(-20, 3.0, 33);
                     } 
                     else {
-                        // --- FASE 2: PEDANG MUNCUL & TILT ARAH PANDANG (33s - 34.5s) ---
-                        if(reb) { 
-                            reb.visible = true; 
-                            reb.position.set(-20.5, 5.4, 33.05); 
-                            reb.rotation.set(-0.15, 0, Math.PI); 
-                        }
-
-                        // POSISI TETAP: Mengunci posisi terakhir dari fase zoom (sekitar Z = 35.6)
-                        camera.position.set(-20, 3.5, 35.6);
-
-                        // TILT: Hanya mengubah arah pandang (lookAt) secara perlahan ke koordinat pedang
-                        const tiltProgress = (time - 33.0) * 0.8; 
-                        camera.lookAt(
-                            -20 - tiltProgress, // Bergeser ke arah pedang (kiri dari sudut pandang Dante)
-                            3.0 - (tiltProgress * 0.2), // Sedikit menunduk ke arah gagang pedang
-                            33
-                        );
+                    // --- FASE 2: PEDANG MUNCUL, MELAYANG & BERPUTAR ---
+                    if(reb) { 
+                        reb.visible = true; 
+                        
+                        // 1. EFEK MELAYANG (Naik-Turun)
+                        const hoverOffset = Math.sin(time * 2) * 0.05;
+                        reb.position.set(-20.5, 5.4 + hoverOffset, 33.05); 
+                        
+                        // 2. EFEK BERPUTAR (Rotation)
+                        // time * 1.5 menentukan kecepatan putaran pedang
+                        // Kita biarkan sumbu X tetap (-0.15) dan Z tetap (Math.PI)
+                        reb.rotation.set(-0.15, time * 1.5, Math.PI); 
                     }
+
+                    // Kamera tetap terkunci posisinya
+                    camera.position.set(-20, 3.5, 35.6);
+
+                    // Tilt arah pandang ke pedang
+                    const tiltProgress = (time - 33.0) * 1.0; 
+                    camera.lookAt(
+                        -20 - tiltProgress, 
+                        3.2 - (tiltProgress * 0.2), 
+                        33
+                    );
+                }
                 }
                 // adegan 8 (34.5-38.5s)
                 else if(time < 38.5) {
@@ -474,93 +485,128 @@
                     // Kamera menatap ke arah kepala Vergil
                     camera.lookAt(-20, 3.45, 41.8);
                 }
-                // adegan 12 (48-53s) - Orbit Shot Belakang Kanan (Dante Diam)
+                // adegan 12 (48-53s) - Orbit Shot Belakang Kanan & Pedang Melayang
                 else if (time < 53.0) {
-                    // Pivot tetap di tengah antara Dante (~Z:33) dan Vergil (Z:42)
+                    const reb = scene.getObjectByName('rebellion');
                     const pivotZ = 37.5; 
                     const pivotX = -20;
                     const radius = 7.0; 
                     
-                    // Rotasi orbit sangat pelan
+                    // Rotasi orbit kamera sangat pelan
                     const t = (time - 48.0) * 0.12; 
-                    const angle = t + (Math.PI * 1.1); // Mulai dari belakang kanan Dante
+                    const angle = t + (Math.PI * 1.1); 
 
                     camera.position.set(
                         pivotX + Math.sin(angle) * radius,
                         3.5, 
                         pivotZ + Math.cos(angle) * radius
                     );
-
                     camera.lookAt(pivotX, 2.8, pivotZ);
 
-                    // --- PERBAIKAN: DANTE TETAP DIAM ---
+                    // --- EFEK PEDANG MELAYANG DI ADEGAN 12 ---
+                    if(reb) {
+                        reb.visible = true;
+                        // Efek naik-turun yang sangat halus (kecepatan 1.2, jarak 0.04)
+                        const hoverOffset = Math.sin(time * 1.2) * 0.04;
+                        
+                        // Posisi dasar pedang disesuaikan dengan posisi Dante (sekitar Z: 33-35)
+                        // Kita kunci posisinya agar tidak ikut berputar dengan kamera
+                        reb.position.set(-20.5, 5.4 + hoverOffset, 33.05);
+                        
+                        // Opsional: berikan rotasi statis atau putar sangat pelan
+                        reb.rotation.set(-0.15, time * 0.5, Math.PI);
+                    }
+
                     playDanteAnim('Stand'); 
-                    // Tidak ada danteModel.position.z += delta
                 }
-                // adegan 13 (53-56s) - Low Angle Dante & Tilt Samping ke Pedang
+                // adegan 13 (53-56s) - Dante Berhenti & Pedang Mengarah ke Vergil
                 else if (time < 56.0) {
                     const reb = scene.getObjectByName('rebellion');
-                    // Mengambil posisi Z Dante secara dinamis agar kamera tetap presisi
                     const danteZ = danteModel ? danteModel.position.z : 33;
                     
                     if (time < 54.0) {
-                        // --- FASE 1: DANTE JALAN MAJU (53-54s) ---
+                        // --- FASE 1: DANTE JALAN & PEDANG MELAYANG ---
                         playDanteAnim('Walk');
                         if (danteModel) danteModel.position.z += delta * 1.5; 
                         
-                        // Kamera Low Angle jarak dekat, ikut mundur sedikit sesuai pergerakan Dante
-                        // X: -20 (tengah), Y: 1.5 (bawah), Z: danteZ + 3.0 (dekat di depan)
-                        camera.position.set(-20, 1.5, danteZ + 3.0); 
-                        camera.lookAt(-20, 3.2, danteZ); // Fokus awal ke arah dada/wajah
+                        if(reb) {
+                            reb.visible = true;
+                            // Pedang mengikuti posisi Dante
+                            reb.position.set(-20.5, 5.4 + Math.sin(time*2)*0.03, danteZ + 0.05);
+                            // Rotasi melayang biasa (sebelum diarahkan)
+                            reb.rotation.set(-0.15, time * 1.5, Math.PI);
+                        }
+
+                        camera.position.set(-20, 2, danteZ + 3.0); 
+                        camera.lookAt(-20, 3.2, danteZ);
                     } 
                     else {
-                        // --- FASE 2: DANTE DIAM & TILT KE KIRI (54-56s) ---
+                        // --- FASE 2: DANTE DIAM & PEDANG POINTER (Diarahkan ke Vergil) ---
                         playDanteAnim('Stand');
                         
-                        // Posisi kamera diam di tempat (Lock)
+                        if(reb) {
+                            // 1. Kunci posisi pedang agar berhenti di tempat
+                            reb.position.set(-21.5, 4.8, danteZ + 0.5);
+
+                            // 2. Transisi Rotasi sumbu X ke 90 derajat (1.57 Radian)
+                            // Kita gunakan lerp manual agar gerakannya halus dari detik 54 ke 54.5
+                            const rotationProgress = Math.min((time - 54.0) * 2, 1.0); 
+                            
+                            // Target: X = 1.57 (90 derajat), Y = 0 (Lurus), Z = Math.PI (Terbalik)
+                            // Kita transisi dari -0.15 ke 1.57 pada sumbu X
+                            const targetX = -0.15 + (rotationProgress * (Math.PI/2 + 0.15));
+                            
+                            reb.rotation.set(targetX, 0, Math.PI);
+                        }
+
+                        // Kamera Tilt ke arah pedang yang menunjuk
                         camera.position.set(-20, 2, danteZ + 3.0);
-                        
-                        // TILT KE KIRI: Mengubah target pandangan ke arah koordinat pedang di kiri
-                        const tiltProgress = (time - 54.0) * 1; 
+                        const tiltProgress = (time - 54.0) * 1.0; 
                         camera.lookAt(
-                            -20 - tiltProgress, // Target bergeser ke arah kiri (X negatif)
-                            3.2 - (tiltProgress * 0.2), // Sedikit turun tapi tetap fokus pada tinggi pedang
+                            -20 - tiltProgress, 
+                            3.2 - (tiltProgress * 0.2), 
                             danteZ
                         );
-                        
-                        if(reb) reb.visible = true;
                     }
                 }
-                // adegan 14 (56-59s) - Vergil Close-up & Vertical Tilt
+                // --- ADEGAN 14 (56.0s - 59.0s): VERGIL CLOSE-UP & YAMATO REVEAL ---
                 else {
                     const vergilZ = vergilModel ? vergilModel.position.z : 42;
+                    const yamato = scene.getObjectByName('yamato');
                     
-                    // Pastikan Vergil tetap pada posisi berdiri dan menghadap Dante
                     playVergilAnim('Stand', 0.2);
                     if(vergilModel) {
-                        vergilModel.position.z = 42;
-                        vergilModel.rotation.y = Math.PI;
+                        vergilModel.position.set(-20, 0, 42); 
+                        vergilModel.rotation.y = Math.PI; 
                     }
 
-                    // POSISI KAMERA: Tetap di level kepala (3.45) agar shot konsisten
-                    // Z: vergilZ - 1.2 (Sangat dekat di depan wajah)
+                    // Posisi Kamera tetap di level kepala
                     camera.position.set(-20, 3.45, vergilZ - 1.2);
 
                     if (time < 57.0) {
-                        // --- FASE 1: VERTICAL TILT (56-57s) ---
-                        const tiltProgress = (time - 56.0); // 0 sampai 1
-                        
-                        camera.lookAt(
-                            -20, 
-                            // KITA NAIKKAN AWALNYA: dari 2.0 (pinggang/dada) ke 3.45 (kepala)
-                            // Sebelumnya 1.0 (terlalu bawah/kaki)
-                            2.0 + (tiltProgress * 1.45), 
-                            vergilZ
-                        );
+                        const tiltProgress = (time - 56.0); 
+                        const currentLookY = 2.0 + (tiltProgress * 1.45);
+                        camera.lookAt(-20, currentLookY, vergilZ);
+
+                        if(yamato) {
+                            yamato.visible = true;
+                            // PERBAIKAN: Menaikkan titik awal dan titik akhir pergerakan pedang
+                            // Mulai dari Y: 2.2 (Dada) naik ke Y: 3.1 (Dekat bahu/wajah)
+                            const yamatoY = 2.2 + (tiltProgress * 0.9);
+                            
+                            // Mendekatkan sedikit posisi Z pedang ke kamera agar lebih jelas terlihat
+                            yamato.position.set(-20.5, yamatoY + 0.3, vergilZ -0.3);
+                            yamato.rotation.set(0.1, 0, -1.6);
+                        }
                     } 
                     else {
-                        // --- FASE 2: LOCK ON FACE (57-59s) ---
+                        // FASE DIAM: Kunci pada posisi tinggi agar tidak hilang dari layar
                         camera.lookAt(-20, 3.45, vergilZ);
+                        if(yamato) {
+                            yamato.visible = true;
+                            yamato.position.set(-20.5, 3.4, vergilZ -0.3);
+                            yamato.rotation.set(0.1, 0, -1.6);
+                        }
                     }
                 }
 
