@@ -63,6 +63,9 @@
         let mixers = []; 
         let danteMixer, vergilMixer;
         
+
+
+        
         // Actions
         let danteActions = {}, activeDanteAction;
         let vergilActions = {}, activeVergilAction;
@@ -159,6 +162,35 @@
             log("Clouds Generated.");
         }
 
+        //polish1
+        function createWindParticles() {
+        const group = new THREE.Group();
+
+        const geo = new THREE.PlaneGeometry(0.35, 0.06);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xbfa98a,
+            transparent: true,
+            opacity: 0.3,
+            depthWrite: false
+        });
+
+        for (let i = 0; i < 120; i++) {
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set(
+                -20 + (Math.random() - 0.5) * 12,
+                1.5 + Math.random() * 4,
+                10 + Math.random() * 25
+            );
+            p.rotation.y = Math.random() * Math.PI;
+p.userData.speed = 3.5 + Math.random() * 4.0;
+            group.add(p);
+        }
+
+        group.visible = false;
+        scene.add(group);
+        return group;
+    }
+
         function init() {
             log("Memulai Three.js (Daytime Sigma)...");
             
@@ -166,10 +198,23 @@
                 scene = new THREE.Scene();
                 
                 // === LANGIT BIRU CERAH ===
-                const skyColor = 0x87CEEB; // Sky Blue klasik
-                scene.background = new THREE.Color(skyColor);
-                // Kabut disesuaikan dengan warna langit agar horizon menyatu
-                scene.fog = new THREE.Fog(skyColor, 20, 120); 
+                //polish1
+                //old
+                // // const skyColor = 0x87CEEB; // Sky Blue klasik     
+                // scene.background = new THREE.Color(skyColor);
+                // // Kabut disesuaikan dengan warna langit agar horizon menyatu
+                // scene.fog = new THREE.Fog(skyColor, 20, 120); 
+               // === SKY COLORS (MOOD CONTROL) ===
+                const SKY_COOL = new THREE.Color(0x9fb3c8); // serious intro
+                const SKY_FUN  = new THREE.Color(0x87CEEB); // funny reveal
+
+                scene.background = SKY_COOL.clone();
+                scene.fog = new THREE.Fog(SKY_COOL.clone(), 20, 120);
+
+                // make accessible in animate()
+                window.SKY_COOL = SKY_COOL;
+                window.SKY_FUN  = SKY_FUN;
+
 
                 camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
                 
@@ -205,6 +250,24 @@
                 dir.shadow.bias = -0.0005;
                 scene.add(dir);
 
+                //polish1
+                // === COLD WIND KEY LIGHT (SAFE) ===
+                const windKey = new THREE.DirectionalLight(0x7faaff, 0.0);
+                windKey.position.set(25, 12, -30);
+                scene.add(windKey);
+
+                // store reference safely
+                window.windKey = windKey;
+                //part2
+                // store base lighting for cinematic modulation
+                dir.userData.baseColor = dir.color.clone();
+                dir.userData.baseIntensity = dir.intensity;
+
+                // make accessible in animate()
+                window.mainDir = dir;
+
+                    
+            
                 // Audio Video
                 const listener = new THREE.AudioListener(); camera.add(listener);
                 sound = new THREE.Audio(listener);
@@ -301,6 +364,8 @@
             
             // PANGGIL FUNGSI AWAN
             createClouds();
+            //maybe
+            window.windParticles = createWindParticles();
 
             if(data.map) { 
                 const m=data.map.scene; 
@@ -332,9 +397,14 @@
                 scene.add(danteModel);
                 danteMixer = new THREE.AnimationMixer(danteModel);
                 mixers.push(danteMixer);
-                if(data.walk.animations.length > 0) danteActions['Walk'] = danteMixer.clipAction(sanitizeClip(data.walk.animations[0]));
+                if(data.walk.animations.length > 0) {
+                    danteActions['Walk'] = danteMixer.clipAction(sanitizeClip(data.walk.animations[0]));
+                    //polish1: FIX GLIDE
+                    danteActions['Walk'].timeScale = 0.7;
+                }
                 if(data.stand && data.stand.animations.length > 0) danteActions['Stand'] = danteMixer.clipAction(sanitizeClip(data.stand.animations[0]));
                 if(danteActions['Stand']) playDanteAnim('Stand');
+
             }
 
             // === VERGIL ===
@@ -395,6 +465,88 @@
 
             if(mode === 'cinematic') {
                 time += delta;
+
+            // polish1
+            
+
+            // --- VIDEO DESYNC SAFETY --
+            if (video && time < 12.2 && time > 8.5) {
+                if (video.paused) video.play();
+            }
+
+            // === SKY MOOD TIMING ( change from the greyish blue to the " meme blue " ")===
+            if (time < 8.0) {
+                scene.background.copy(window.SKY_COOL);
+                scene.fog.color.copy(window.SKY_COOL);
+            }
+            else if (time < 10.0) {
+                const t = (time - 8.0) / 2.0; // smooth blend
+                scene.background.copy(window.SKY_COOL).lerp(window.SKY_FUN, t);
+                scene.fog.color.copy(window.SKY_COOL).lerp(window.SKY_FUN, t);
+            }
+            else {
+                scene.background.copy(window.SKY_FUN);
+                scene.fog.color.copy(window.SKY_FUN);
+            }
+
+            // === WIND PARTICLES (FIRST 8s) ===
+            if (window.windParticles) {
+                if (time < 8.0) {
+                    window.windParticles.visible = true;
+                    window.windParticles.children.forEach(p => {
+            p.position.x += delta * p.userData.speed * 2.5;
+            p.position.y += delta * 0.05;
+
+
+                        if (p.position.x > -14) {
+                            p.position.x = -26;
+                        }
+                    });
+                } else {
+                    window.windParticles.visible = false;
+                }
+            }
+
+            
+            // === PRE-VIDEO COLD WIND MOOD (LIGHT ONLY) ===
+            if (time < 8.5 && window.windKey) {
+                // sharp, cold pulse — no accumulation
+                window.windKey.intensity = 0.8 + Math.sin(time * 3.0) * 0.3;
+            } else if (window.windKey) {
+                window.windKey.intensity = 0.0;
+            }
+            // polish2 — PRE-VIDEO FOG PRESSURE (SAFE)
+            if (time < 8.5) {
+                // pull fog closer, slight pulse
+                scene.fog.near = 12;
+                scene.fog.far  = 55 + Math.sin(time * 1.2) * 4;
+            } else {
+                // restore clean daylight
+                scene.fog.near = 20;
+                scene.fog.far  = 120;
+            }
+            // === PRE-CHAIR CAMERA ENERGY (NO DRIFT) ===
+            if (time < 8.5) {
+                const swayX = Math.sin(time * 2.2) * 0.06;
+                const swayY = Math.sin(time * 1.6) * 0.04;
+
+                camera.rotation.x += swayY;
+                camera.rotation.y += swayX;
+            }
+            // === COOL INTRO LIGHTING (FIRST 8s) ===
+            if (time < 8.5 && window.mainDir) {
+                // colder, harsher light
+                window.mainDir.color.setHex(0xc9d6ff); // cool steel blue
+                window.mainDir.intensity = window.mainDir.userData.baseIntensity * 1.2;
+            } else if (window.mainDir) {
+                // restore normal daylight
+                window.mainDir.color.copy(window.mainDir.userData.baseColor);
+                window.mainDir.intensity = window.mainDir.userData.baseIntensity;
+            }
+
+
+
+
                 document.getElementById('debug-timer').innerText = "TIME: " + time.toFixed(2);
                 if(time>2 && !sound.isPlaying && sound.buffer) sound.play();
 
